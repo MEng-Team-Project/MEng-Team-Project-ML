@@ -1,0 +1,3 @@
+[submodule "yolov7-segmentation"]
+	path = yolov7-segmentation
+	url = https://github.com/MiscellaneousStuff/yolov7-segmentation
