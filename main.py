@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import json
 
 from flask import Flask, request, jsonify
 
@@ -17,10 +18,18 @@ ANALYSIS_BASE = "C://Users//win8t//OneDrive//Desktop//projects//traffic-core//yo
 OFFLINE_ANALYSIS = lambda source, half, tracking: \
     f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --save-txt --save-conf --img-size 640 {tracking}'
 
-@app.route("/api/", methods=["GET"])
-def index():
-    """API Testing Endpoint."""
-    return jsonify("Hello, World!")
+def get_analysis(base_dir):
+    info_s = list(filter(lambda x: "_info" in x, os.listdir(base_dir)))
+    info_s = [os.path.join(base_dir, info) for info in info_s]
+    info_s = sorted(info_s, key=len)
+    info_s_s = []
+    for i, info in enumerate(info_s):
+        with open(info) as f:
+            data = "".join(list(filter(None, f.read().split("\n"))))
+            d = json.loads(data)
+        info_s_s.append(d)
+    data = json.dumps(info_s_s)
+    return data
 
 @app.route("/api/analysis/", methods=["GET"])
 def analysis():
@@ -30,9 +39,12 @@ def analysis():
         experiment - "exp" dir which contains analytical information.
                       Meant for debugging only."""
     try:
-        args = request.args
-        experiment = args.get("experiment")
-        exp  = os.path.join(ANALYSIS_BASE, experiment, "/labels")
+        args         = request.args
+        experiment   = args.get("experiment")
+        stream       = args.get("stream")
+        analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
+        data         = get_analysis(analysis_dir)
+        return jsonify(data)
     except Exception as e:
         return jsonify("Error:", str(e)), 400
 
