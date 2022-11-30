@@ -48,7 +48,7 @@ def init():
         source   = content["source"]
         half     = True
         half     = "half" if half else ""
-        tracking = False
+        tracking = True
         tracking = "--trk" if tracking else ""
 
         args = list(filter(None, OFFLINE_ANALYSIS(source, half, tracking).split(" ")))
