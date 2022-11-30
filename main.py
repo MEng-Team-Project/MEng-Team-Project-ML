@@ -18,17 +18,34 @@ ANALYSIS_BASE = "C://Users//win8t//OneDrive//Desktop//projects//traffic-core//yo
 OFFLINE_ANALYSIS = lambda source, half, tracking: \
     f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --save-txt --save-conf --img-size 640 {tracking}'
 
-def get_analysis(base_dir):
-    info_s = list(filter(lambda x: "_info" in x, os.listdir(base_dir)))
-    info_s = [os.path.join(base_dir, info) for info in info_s]
-    info_s = sorted(info_s, key=len)
-    info_s_s = []
-    for i, info in enumerate(info_s):
-        with open(info) as f:
-            data = "".join(list(filter(None, f.read().split("\n"))))
+def get_sub_analysis(base_dir, data_type):
+    suffix = data_type if data_type else ""
+    fi_s = list(filter(lambda x: suffix in x, os.listdir(base_dir)))
+    fi_s = [os.path.join(base_dir, fi) for fi in fi_s]
+    fi_s = sorted(fi_s, key=len)
+    fi_s_s = []
+    for i, fi in enumerate(fi_s):
+        with open(fi) as f:
+            if data_type:
+                data = "".join(list(filter(None, f.read().split("\n"))))
+            else:
+                data = "[" + ",".join(list(filter(None, f.read().split("\n")))) + "]"
+            idx = fi.split("_")[-1].split(".")[0]
             d = json.loads(data)
-        info_s_s.append(d)
-    data = json.dumps(info_s_s)
+            d["frame"] = idx
+        fi_s_s.append(d)
+    data = json.dumps(fi_s_s)
+    return data
+    
+def get_analysis(base_dir):
+    info_data    = get_sub_analysis(base_dir, "_info")
+    segment_data = get_sub_analysis(base_dir, "")
+    track_data   = get_sub_analysis(base_dir, "_track")
+    data = {
+        "info":    info_data,
+        "segment": segment_data,
+        "track":   track_data
+    }
     return data
 
 @app.route("/api/analysis/", methods=["GET"])
@@ -37,13 +54,16 @@ def analysis():
     
     args:
         experiment - "exp" dir which contains analytical information.
-                      Meant for debugging only."""
+                      Meant for debugging only.
+        stream     - Stream ID to get data for.
+        data_type  - Data type to retrieve (info, segment, track)."""
     try:
         args         = request.args
         experiment   = args.get("experiment")
         stream       = args.get("stream")
+        data_type    = args.get("data_type")
         analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
-        data         = get_analysis(analysis_dir)
+        data         = get_sub_analysis(analysis_dir, data_type)
         return jsonify(data)
     except Exception as e:
         return jsonify("Error:", str(e)), 400
