@@ -55,31 +55,38 @@ def get_analysis(base_dir, start=0, end=0):
 
 def get_experiment(stream):
     experiments = os.listdir(ANALYSIS_BASE)
-    
+    found = [os.path.exists(
+                os.path.join(ANALYSIS_BASE, f"{exp_dir}/", f"{stream}.mp4"))
+             for exp_dir in experiments]
+    data = zip(experiments, found)
+    data = [exp for exp, found in data if found]
+    return data
 
 @app.route("/api/analysis/", methods=["GET"])
 def analysis():
     """Get analytical information of a video source.
     
     args:
-        experiment - "exp" dir which contains analytical information.
-                      Meant for debugging only.
         stream     - Stream ID to get data for.
         data_type  - Data type to retrieve (info, track).
         start      - (Optional) Start frame to retrieve data from, inclusive.
         end        - (Optional) End frame to retrieve data to, inclusive."""
     try:
         args         = request.args
-        experiment   = args.get("experiment")
         stream       = args.get("stream")
+        experiment   = get_experiment(stream)
+        experiment   = experiment[0]
         data_type    = args.get("data_type")
         start        = args.get("start") if "start" in args else -1
         end          = args.get("end")   if "end" in args else -1
         analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
+
+        
         if data_type == "all":
             data = get_analysis(analysis_dir, int(start), int(end))
         else:
             data = get_sub_analysis(analysis_dir, data_type, int(start), int(end))
+
         return jsonify(data)
     except Exception as e:
         return jsonify("Error:", str(e)), 400
