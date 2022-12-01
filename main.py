@@ -75,7 +75,7 @@ def analysis():
         args         = request.args
         stream       = args.get("stream")
         experiment   = get_experiment(stream)
-        experiment   = experiment[0]
+        experiment   = experiment[-1]
         data_type    = args.get("data_type")
         start        = args.get("start") if "start" in args else -1
         end          = args.get("end")   if "end" in args else -1
