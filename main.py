@@ -62,6 +62,29 @@ def get_experiment(stream):
     data = [exp for exp, found in data if found]
     return data
 
+@app.route("/api/download/", methods=["GET"])
+def download():
+    """Download all analytical information for a video source.
+    
+    args:
+        stream      - Stream ID to get data for.
+        destination - Local path to download file to."""
+    try:
+        args         = request.args
+        stream       = args.get("stream")
+        experiment   = get_experiment(stream)[-1]
+        analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
+        destination  = args.get("destination")
+        if os.path.exists(destination):
+            return jsonify("File already exists!")
+            
+        data = get_analysis(analysis_dir, 0, 0)
+        with open(destination, "w") as f:
+            f.write(json.dumps(data, indent=4))
+        return jsonify(f"JSON data downloaded to: {destination}")
+    except Exception as e:
+        return jsonify("Error:", str(e)), 400
+
 @app.route("/api/analysis/", methods=["GET"])
 def analysis():
     """Get analytical information of a video source.
@@ -81,7 +104,6 @@ def analysis():
         end          = args.get("end")   if "end" in args else -1
         analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
 
-        
         if data_type == "all":
             data = get_analysis(analysis_dir, int(start), int(end))
         else:
