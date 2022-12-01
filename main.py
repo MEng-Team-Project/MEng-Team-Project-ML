@@ -53,6 +53,10 @@ def get_analysis(base_dir, start=0, end=0):
     }
     return data
 
+def get_experiment(stream):
+    experiments = os.listdir(ANALYSIS_BASE)
+    
+
 @app.route("/api/analysis/", methods=["GET"])
 def analysis():
     """Get analytical information of a video source.

@@ -5,6 +5,13 @@
 Microservice designed to accept analysis batch / live jobs and information
 requests from a backend.
 
+## Assumptions
+
+- Only accepts .mp4 source files. This is enforced during video stream
+  upload by only accepting .mp4 files and live streams should be converted
+  using either ffmpeg dynamically, or when yolov7 outputs a video it
+  also needs ffmpeg to convert it to a lower bit-rate .mp4.
+
 ## Utility Files
 
 - `check.py` is designed to verify the analytical information being
