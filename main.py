@@ -19,6 +19,7 @@ OFFLINE_ANALYSIS = lambda source, half, tracking: \
     f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --save-txt --save-conf --img-size 640 {tracking}'
 
 def get_sub_analysis(base_dir, data_type, start=0, end=0):
+    """Retrieves analysis data for specific data type for a video source."""
     print("start, end:", start, end)
     suffix = data_type if data_type else ""
     fi_s = list(filter(lambda x: suffix in x, os.listdir(base_dir)))
@@ -45,6 +46,7 @@ def get_sub_analysis(base_dir, data_type, start=0, end=0):
     return data
     
 def get_analysis(base_dir, start=0, end=0):
+    """Retrieves all analysis data for a video source."""
     info_data    = get_sub_analysis(base_dir, "_info", start, end)
     track_data   = get_sub_analysis(base_dir, "_track", start, end)
     data = {
@@ -54,6 +56,7 @@ def get_analysis(base_dir, start=0, end=0):
     return data
 
 def get_experiment(stream):
+    """Retrieves the most recent video analysis folder for a video source."""
     experiments = os.listdir(ANALYSIS_BASE)
     found = [os.path.exists(
                 os.path.join(ANALYSIS_BASE, f"{exp_dir}/", f"{stream}.mp4"))
@@ -72,18 +75,21 @@ def download():
     try:
         args         = request.args
         stream       = args.get("stream")
-        experiment   = get_experiment(stream)[-1]
+        experiment   = get_experiment(stream)
+        if len(experiment) == 0:
+            return jsonify(f"Video has not been analysed: {stream}"), 400
+        experiment   = experiment[-1]
         analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
         destination  = args.get("destination")
         if os.path.exists(destination):
             return jsonify("File already exists!")
-            
+
         data = get_analysis(analysis_dir, 0, 0)
         with open(destination, "w") as f:
             f.write(json.dumps(data, indent=4))
         return jsonify(f"JSON data downloaded to: {destination}")
     except Exception as e:
-        return jsonify("Error:", str(e)), 400
+        return jsonify("Error: " + str(e)), 400
 
 @app.route("/api/analysis/", methods=["GET"])
 def analysis():
@@ -133,8 +139,8 @@ def init():
         logging.info(args)
         subprocess.Popen(
             args,
-            #stdout=subprocess.PIPE,
-            #stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=os.getcwd())
 
         return jsonify("Video stream analysis successfully started")

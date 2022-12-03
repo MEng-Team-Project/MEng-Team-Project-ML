@@ -24,3 +24,4 @@ requests from a backend.
   than full tracked detections as (I believe) there can be multiple segments
   per individual object. Then the tracked detections are complete objects
   which are being tracked by the [Kalman Filter](https://en.wikipedia.org/wiki/Kalman_filter).
+- `m3u8.py`
