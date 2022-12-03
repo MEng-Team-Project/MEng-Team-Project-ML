@@ -24,4 +24,9 @@ requests from a backend.
   than full tracked detections as (I believe) there can be multiple segments
   per individual object. Then the tracked detections are complete objects
   which are being tracked by the [Kalman Filter](https://en.wikipedia.org/wiki/Kalman_filter).
-- `m3u8.py`
+- `live_metadata.py` displays the multimedia playlist which informs
+  clients which .ts files (livestream video segments) to download in which order
+  to correctly view the livestream. Useful for understanding how the .ts files
+  should be fed into the microservice for batch processing the videos for
+  analysis when we come to deploy the system for real, and also providing a
+  user who is viewing our client with real-time route tracking / object recognition.
