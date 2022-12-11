@@ -22,6 +22,8 @@
 """Scrape target videos from TFL JamCams indefinitely to build a test dataset
 for the traffic analysis library."""
 
+import time
+
 from absl import app
 from absl import flags
 
@@ -29,10 +31,14 @@ from traffic_ml.lib.tfl import TFLScraper, get_targets, download_metadata
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("video_dir", None, "Directory to store scraped TFL JamCam videos")
+flags.DEFINE_string("targets", "targets.txt", "Text file containing TFL JamCam ids to scrape")
 
-def main(unused_argv):
-    targets   = get_targets()
-    video_dir = FLAGS.video_dir
+flags.mark_flag_as_required("video_dir")
+
+def go():
+    targets_fname = FLAGS.targets
+    video_dir     = FLAGS.video_dir
+    targets   = get_targets(targets_fname)
     scraper   = TFLScraper(video_dir)
 
     # Download metadata
@@ -41,6 +47,11 @@ def main(unused_argv):
     # Download a video for each target
     for target in targets:
         scraper.download_video(target)
+    
+def main(unused_argv):
+    while True:
+        go()
+        time.sleep(60)
         
 def entry_point():
     app.run(main)
