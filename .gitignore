@@ -130,3 +130,8 @@ dmypy.json
 
 # Ignore PyTorch model checkpoints
 *.pt
+
+# Ignore TFL JamCam targets and metadata
+targets.txt
+camera_updates.xml
+metadata.json
