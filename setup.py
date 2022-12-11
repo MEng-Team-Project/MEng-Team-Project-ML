@@ -54,6 +54,7 @@ setup(
         'traffic_ml',
         'traffic_ml.bin',
         'traffic_ml.lol',
+        'traffic_ml.tests'
     ],
     install_requires=[
         "absl",
