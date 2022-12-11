@@ -32,7 +32,6 @@ Read the README at https://github.com/MEng-Team-Project/MEng-Team-Project-ML
 for more information.
 """
 
-
 setup(
     name='traffic-ml',
     version='1.0.0',

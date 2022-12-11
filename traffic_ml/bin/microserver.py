@@ -1,3 +1,28 @@
+# MIT License
+# 
+# Copyright (c) 2022 MEng-Team-Project
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Traffic analysis deep learning microservice which performs analysis of
+video footage for identification, count and route tracking of vehicles
+and people."""
+
 import logging
 import os
 import subprocess
@@ -10,13 +35,17 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string ("host", "localhost", "Host IP")
-flags.DEFINE_integer("port", 6000,        "Host port")
+flags.DEFINE_integer("port", 6000, "Host port")
+flags.DEFINE_string ("analysis_dir", None, "Directory which yolo model is storing analysis outputs")
+
+flags.mark_flag_as_required("analysis_dir")
 
 app = Flask(__name__)
 
-ANALYSIS_BASE = "C://Users//win8t//OneDrive//Desktop//projects//traffic-core//yolov7-segmentation//runs//predict-seg//"
 OFFLINE_ANALYSIS = lambda source, half, tracking: \
     f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --save-txt --save-conf --img-size 640 {tracking}'
+
+ANALYSIS_BASE = None
 
 def get_sub_analysis(base_dir, data_type, start=0, end=0):
     """Retrieves analysis data for specific data type for a video source."""
@@ -44,7 +73,7 @@ def get_sub_analysis(base_dir, data_type, start=0, end=0):
         fi_s_s.append(d)
     data = json.dumps(fi_s_s)
     return data
-    
+
 def get_analysis(base_dir, start=0, end=0):
     """Retrieves all analysis data for a video source."""
     info_data    = get_sub_analysis(base_dir, "_info", start, end)
@@ -148,7 +177,12 @@ def init():
     except Exception as e:
         return jsonify("Error:", str(e)), 400
 
+@app.route("/api/", methods=["GET"])
+def get():
+    return jsonify("Hiya!")
+
 def main(unused_argv):
+    ANALYSIS_BASE = FLAGS.analysis_dir
     app.run(host=FLAGS.host, port=FLAGS.port)
 
 def entry_point():

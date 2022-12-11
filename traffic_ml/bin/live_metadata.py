@@ -1,4 +1,4 @@
-import live_metadata
+import traffic_ml.bin.live_metadata as live_metadata
 
 m3u8_path = "C:\\Users\\win8t\\OneDrive\\Desktop\\projects\\traffic-web\\server\\livestream\\"
 
