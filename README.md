@@ -23,7 +23,7 @@ requests from a backend.
 - Also accepts .m3u8 playlist files or .ts HLS livestream video segment files
   for analysing realtime IP video streams.
 
-## Utility Files (Old)
+## Utility Files
 
 - `traffic_ml/bin/check` is designed to verify the analytical information being
   produced by the forked `yolov7-segmentation` submodule is producing
