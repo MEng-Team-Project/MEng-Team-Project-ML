@@ -42,7 +42,7 @@ requests from a backend.
   analysis when we come to deploy the system for real, and also providing a
   user who is viewing our client with real-time route tracking / object recognition.
 
-# YoloV7 Outputs
+## YoloV7 Outputs
 
 To move all of yolov7's predicted outputs from it's individual experimental
 directories into one single directory, you can use the following command to
