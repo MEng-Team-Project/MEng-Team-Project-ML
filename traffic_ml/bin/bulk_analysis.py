@@ -44,8 +44,6 @@ def main(unused_argv):
     video_dir = FLAGS.video_dir
     videos    = os.listdir(video_dir)
 
-    print("videos:", videos)
-
     for i, video in enumerate(videos):
         print(video)
         
@@ -62,6 +60,7 @@ def main(unused_argv):
 
         start_time = time.time()
 
+        # Pipeing the output will run this command async
         subprocess.run(
             args,
             #stdout=subprocess.PIPE,
