@@ -46,7 +46,7 @@ requests from a backend.
 
 To move all of yolov7's predicted outputs from it's individual experimental
 directories into one single directory, you can use the following command to
-do this (assumes bash like terminal, you can use WSL on Windows).
+do this (assumes bash like terminal, you can use MinGW or WSL on Windows).
 
 ```bash
 cp .../predict-seg/**/*.mp4 .../destination
