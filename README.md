@@ -7,9 +7,11 @@ requests from a backend.
 
 ## TODO
 
-- [ ] TFL JamCam Video Scraper Datasets
-  - [ ] Create dataset for multiple conditions
-     - [ ] Day time conditions
+- [x] TFL JamCam Video Scraper Datasets
+  - [x] Create dataset for multiple conditions
+     - [x] Day time conditions
+           [Raw Videos](https://drive.google.com/drive/u/2/folders/1igKtgK_b13TBwwnDnX5_8y_3ij6R31i_),
+           [Analysis Videos](https://drive.google.com/drive/u/2/folders/1TYaEDctAyxikJD2Oj717cl2KbSIDA2HB)
      - [x] Night time (incl. snow) conditions \
            [Raw Videos](https://drive.google.com/drive/u/2/folders/1lSoRB_HmgSLUxehpu7O44jQFB9U6hdWC),
            [Analysis Videos](https://drive.google.com/drive/u/2/folders/1JOJKVzakrFLt5tC5PpMq6zl6SGPwMopl)
