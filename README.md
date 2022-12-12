@@ -25,7 +25,7 @@ requests from a backend.
 
 ## Utility Files (Old)
 
-- `check.py` is designed to verify the analytical information being
+- `traffic_ml/bin/check` is designed to verify the analytical information being
   produced by the forked `yolov7-segmentation` submodule is producing
   sensible data. If you run the script (after setting the correct
   parameters within the file), you should find that the `Tracked Detections`
@@ -35,12 +35,18 @@ requests from a backend.
   than full tracked detections as (I believe) there can be multiple segments
   per individual object. Then the tracked detections are complete objects
   which are being tracked by the [Kalman Filter](https://en.wikipedia.org/wiki/Kalman_filter).
+  Run this using:
+  ```bash
+  python -m traffic_ml.bin.check --analysis_dir "" --fname ""
+  ```
+<!--
 - `live_metadata.py` displays the multimedia playlist which informs
   clients which .ts files (livestream video segments) to download in which order
   to correctly view the livestream. Useful for understanding how the .ts files
   should be fed into the microservice for batch processing the videos for
   analysis when we come to deploy the system for real, and also providing a
   user who is viewing our client with real-time route tracking / object recognition.
+-->
 
 ## YoloV7 Outputs
 
