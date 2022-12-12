@@ -14,12 +14,14 @@ requests from a backend.
            [Raw Videos](https://drive.google.com/drive/u/2/folders/1lSoRB_HmgSLUxehpu7O44jQFB9U6hdWC),
            [Analysis Videos](https://drive.google.com/drive/u/2/folders/1JOJKVzakrFLt5tC5PpMq6zl6SGPwMopl)
 
-## Assumptions
+## File Formats
 
-- Only accepts .mp4 source files. This is enforced during video stream
+- Accepts .mp4 source files. This is enforced during video stream
   upload by only accepting .mp4 files and live streams should be converted
   using either ffmpeg dynamically, or when yolov7 outputs a video it
   also needs ffmpeg to convert it to a lower bit-rate .mp4.
+- Also accepts .m3u8 playlist files or .ts HLS livestream video segment files
+  for analysing realtime IP video streams.
 
 ## Utility Files
 
