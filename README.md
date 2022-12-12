@@ -5,6 +5,14 @@
 Microservice designed to accept analysis batch / live jobs and information
 requests from a backend.
 
+## TODO
+
+- [ ] TFL JamCam Video Scraper Datasets
+  - [ ] Create dataset for multiple conditions
+     - [ ] Day time conditions
+     - [ ] Night time conditions
+     - [x] Snow conditions
+
 ## Assumptions
 
 - Only accepts .mp4 source files. This is enforced during video stream
