@@ -10,8 +10,9 @@ requests from a backend.
 - [ ] TFL JamCam Video Scraper Datasets
   - [ ] Create dataset for multiple conditions
      - [ ] Day time conditions
-     - [x] Night time conditions
-     - [x] Snow conditions
+     - [x] Night time (incl. snow) conditions \
+           [Raw Videos](https://drive.google.com/drive/u/2/folders/1lSoRB_HmgSLUxehpu7O44jQFB9U6hdWC),
+           [Analysis Videos](https://drive.google.com/drive/u/2/folders/1JOJKVzakrFLt5tC5PpMq6zl6SGPwMopl)
 
 ## Assumptions
 
