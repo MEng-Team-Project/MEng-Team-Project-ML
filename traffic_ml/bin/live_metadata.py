@@ -21,6 +21,10 @@
 # SOFTWARE.
 """Analyse HLS playlist and video segment files."""
 
+if __name__ == "__main__":
+    print("ASSUME BROKEN FOR NOW!")
+
+"""
 from absl import app
 from absl import flags
 
@@ -35,3 +39,4 @@ def entry_point():
 
 if __name__ == "__main__":
     app.run(main)
+"""
