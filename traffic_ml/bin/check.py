@@ -32,8 +32,6 @@ from absl import app
 from absl import flags    
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string ("host", "localhost", "Host IP")
-flags.DEFINE_integer("port", 6000, "Host port")
 flags.DEFINE_string ("analysis_dir", None, "Directory which yolo model is storing analysis outputs")
 flags.DEFINE_string ("fname", None, "Video filename with extension")
 flags.mark_flag_as_required("analysis_dir")
