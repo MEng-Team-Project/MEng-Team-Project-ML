@@ -41,3 +41,13 @@ requests from a backend.
   should be fed into the microservice for batch processing the videos for
   analysis when we come to deploy the system for real, and also providing a
   user who is viewing our client with real-time route tracking / object recognition.
+
+# YoloV7 Outputs
+
+To move all of yolov7's predicted outputs from it's individual experimental
+directories into one single directory, you can use the following command to
+do this (assumes bash like terminal, you can use WSL on Windows).
+
+```bash
+cp .../predict-seg/**/*.mp4 .../destination
+```
