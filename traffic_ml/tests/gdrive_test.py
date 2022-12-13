@@ -22,6 +22,7 @@
 """Google Drive utilities testing."""
 
 import ffmpeg
+import os
 
 from absl.testing import absltest
 
@@ -42,6 +43,10 @@ class TestGDriveDownload(utils.TestCase):
         else:
             print("Invalid shareable URL link:", TEST_FILE_LINK)
 
+    def tearDown(self):
+        super(TestGDriveDownload, self).tearDown()
+
+        os.remove(TEST_FILE_DESTINATION)
 
 if __name__ == "__main__":
     absltest.main()
