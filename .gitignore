@@ -134,3 +134,6 @@ dmypy.json
 targets.txt
 camera_updates.xml
 metadata.json
+
+# Ignore testing .mp4s at root level
+.mp4
