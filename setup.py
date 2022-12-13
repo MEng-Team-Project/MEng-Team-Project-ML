@@ -53,11 +53,10 @@ setup(
     packages=[
         'traffic_ml',
         'traffic_ml.bin',
-        'traffic_ml.lol',
+        'traffic_ml.lib',
         'traffic_ml.tests'
     ],
     install_requires=[
-        "absl",
         "absl_py",
         "albumentations",
         "coremltools",

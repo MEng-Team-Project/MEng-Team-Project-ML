@@ -70,7 +70,7 @@ def get_gdrive_id(url):
     except:
         return None
 
-if __name__ == "__main__":
+def run():
     TEST_FILE_LINK = "https://drive.google.com/file/d/1g_YASd9Rs_eAw4H_inGcFnDwQDmsj-fo/view?usp=share_link"
     destination = "./00001.01350_2022-12-07T15-35-24.000Z.mp4"
     gdrive_id      = get_gdrive_id(TEST_FILE_LINK)
@@ -78,3 +78,6 @@ if __name__ == "__main__":
         download_file_from_google_drive(gdrive_id, destination)
     else:
         print("Invalid shareable URL link:", TEST_FILE_LINK)
+
+if __name__ == "__main__":
+    run()
