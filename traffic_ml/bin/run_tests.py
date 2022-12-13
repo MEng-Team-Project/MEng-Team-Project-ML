@@ -19,15 +19,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Traffic-ML module: https://github.com/MEng-Team-Project/MEng-Team-Project-ML ."""
+"""Find and run the tests.
 
-import os
+Run as: python -m traffic_ml.bin.run_tests"""
 
-__version__ = "1.0.0"
+from absl.testing import absltest
 
-def load_tests(loader, standard_tests, unused_pattern):
-    """Our tests end in `_test.py`, so need to override the test discovery."""
-    this_dir = os.path.dirname(__file__)
-    package_tests = loader.discover(start_dir=this_dir, pattern="*_test.py")
-    standard_tests.addTests(package_tests)
-    return standard_tests
+import traffic_ml
+
+if __name__ == "__main__":
+    absltest.main(module=traffic_ml)

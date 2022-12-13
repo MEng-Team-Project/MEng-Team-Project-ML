@@ -28,7 +28,7 @@ class TestCase(absltest.TestCase):
     """A test base class that enables stopwatch profiling."""
 
     def setUp(self):
-        super(TestCase, self).setup()
+        super(TestCase, self).setUp()
 
     def tearDown(self):
         super(TestCase, self).tearDown()

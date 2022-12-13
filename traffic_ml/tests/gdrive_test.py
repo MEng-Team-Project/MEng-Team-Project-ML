@@ -19,15 +19,29 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Traffic-ML module: https://github.com/MEng-Team-Project/MEng-Team-Project-ML ."""
+"""Google Drive utilities testing."""
 
-import os
+import ffmpeg
 
-__version__ = "1.0.0"
+from absl.testing import absltest
 
-def load_tests(loader, standard_tests, unused_pattern):
-    """Our tests end in `_test.py`, so need to override the test discovery."""
-    this_dir = os.path.dirname(__file__)
-    package_tests = loader.discover(start_dir=this_dir, pattern="*_test.py")
-    standard_tests.addTests(package_tests)
-    return standard_tests
+from traffic_ml.tests import utils
+from traffic_ml.lib.gdrive import get_gdrive_id, download_file_from_google_drive
+
+TEST_FILE_LINK        = "https://drive.google.com/file/d/1g_YASd9Rs_eAw4H_inGcFnDwQDmsj-fo/view?usp=share_link"
+TEST_FILE_DESTINATION = "./00001.01350_2022-12-07T15-35-24.000Z.mp4"
+TARGET_DURATION_TS    = 133632
+
+class TestGDriveDownload(utils.TestCase):
+    def test_gdrive_download(self):
+        gdrive_id = get_gdrive_id(TEST_FILE_LINK)
+        if gdrive_id:
+            download_file_from_google_drive(gdrive_id, TEST_FILE_DESTINATION)
+            metadata = ffmpeg.probe(TEST_FILE_DESTINATION)["streams"][0]
+            self.assertEqual(metadata["duration_ts"], TARGET_DURATION_TS)
+        else:
+            print("Invalid shareable URL link:", TEST_FILE_LINK)
+
+
+if __name__ == "__main__":
+    absltest.main()
