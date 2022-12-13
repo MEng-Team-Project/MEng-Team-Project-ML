@@ -15,6 +15,12 @@ requests from a backend.
      - [x] Night time (incl. snow) conditions \
            [Raw Videos](https://drive.google.com/drive/u/2/folders/1lSoRB_HmgSLUxehpu7O44jQFB9U6hdWC),
            [Analysis Videos](https://drive.google.com/drive/u/2/folders/1JOJKVzakrFLt5tC5PpMq6zl6SGPwMopl)
+- [ ] Custom Object Analysis Tested
+   - [x] Bus (Detect Objects in Bus Lane)
+      - Camera ID: 03752, contains a bus stop. This is used as the test set.
+      - [Requirement](https://docs.google.com/document/d/1Q0TwboSrRgvXywVp9VgA9of2G4NjYQBYJ2YSKbkoS-o/edit#bookmark=id.hnc674tzl7ba)
+   - [ ] HGV
+   - [x] People (This is tested throughout the day time and night time datasets)
 
 ## File Formats
 

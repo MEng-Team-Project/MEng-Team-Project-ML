@@ -38,8 +38,8 @@ flags.mark_flag_as_required("video_dir")
 def go():
     targets_fname = FLAGS.targets
     video_dir     = FLAGS.video_dir
-    targets   = get_targets(targets_fname)
-    scraper   = TFLScraper(video_dir)
+    targets       = get_targets(targets_fname)
+    scraper       = TFLScraper(video_dir)
 
     # Download metadata
     download_metadata()

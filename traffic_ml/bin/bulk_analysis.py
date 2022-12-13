@@ -37,8 +37,13 @@ flags.DEFINE_boolean("tracking",  True, "Track objects across frames in videos a
 flags.DEFINE_integer("size",      640,  "Yolo image input size")
 flags.mark_flag_as_required("video_dir")
 
+"""
 OFFLINE_ANALYSIS = lambda source, half, size, tracking: \
     f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --save-txt --save-conf --img-size {size} {tracking}'
+"""
+
+OFFLINE_ANALYSIS = lambda source, half, size, tracking: \
+    f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --img-size {size} {tracking}'
 
 def main(unused_argv):
     video_dir = FLAGS.video_dir
