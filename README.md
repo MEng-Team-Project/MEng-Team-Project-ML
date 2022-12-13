@@ -1,9 +1,40 @@
 # MEng-Team-Project-ML
 
-## About
+MEng-Team-Project-ML contains the microservice which performs analysis 
+of recorded and live video streams to extract information relating to 
+the identity, count and travelled route of motor vehicles, bikes and 
+people. This repo also contains notebooks with analysis of real data 
+extracted using real-world datasets. The main real-world testing dataset 
+used throughout this repository are the TFL JamCam videos which are 
+almost real-time videos provided by Transport for London (TfL) across 
+100s of locations across london. They are useful for this project as 
+they cover many different types of locations which helps validate the 
+robustness of our proposed solution. This repository is provided 
+as an installable python module as many command-line utilities are 
+provided, most important of which is the microservice which the 
+accompanying frontend and backend rely on. 
+Refer to the [Web](https://github.com/MEng-Team-Project/MEng-Team-Project-Web)
+repository for more information.
 
-Microservice designed to accept analysis batch / live jobs and information
-requests from a backend.
+## Quick Start Guide
+
+### Install the Python Package
+
+You can install this python package from a local clone of the git repo by
+doing the following:
+
+```bash
+git clone https://github.com/MEng-Team-Project/MEng-Team-Project-ML
+python -m pip install --upgrade MEng-Team-Project-ML
+```
+
+## Run the Microservice
+
+To run the microservice, run the following code:
+
+```bash
+python -m traffic_ml.bin.microservice --analysis_dir "./yolov7-segmentation/runs/predicted-seg/"
+```
 
 ## TODO
 
@@ -65,3 +96,9 @@ do this (assumes bash like terminal, you can use MinGW or WSL on Windows).
 ```bash
 cp .../predict-seg/**/*.mp4 .../destination
 ```
+
+## Notebooks
+
+- `main.ipynb` Analysis of the initial JSON files produced in the original
+  draft version of our proposed model. Notebook contains code used to determine
+  road routes, code used to calculate counts of object types along routes, etc.

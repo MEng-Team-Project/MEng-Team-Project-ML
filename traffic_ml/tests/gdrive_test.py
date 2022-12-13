@@ -33,6 +33,7 @@ TEST_FILE_LINK        = "https://drive.google.com/file/d/1g_YASd9Rs_eAw4H_inGcFn
 TEST_FILE_DESTINATION = "./00001.01350_2022-12-07T15-35-24.000Z.mp4"
 TARGET_DURATION_TS    = 133632
 
+
 class TestGDriveDownload(utils.TestCase):
     def test_gdrive_download(self):
         gdrive_id = get_gdrive_id(TEST_FILE_LINK)
@@ -47,6 +48,7 @@ class TestGDriveDownload(utils.TestCase):
         super(TestGDriveDownload, self).tearDown()
 
         os.remove(TEST_FILE_DESTINATION)
+
 
 if __name__ == "__main__":
     absltest.main()
