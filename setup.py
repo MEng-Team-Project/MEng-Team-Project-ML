@@ -101,7 +101,7 @@ setup(
         'Operating System :: Microsoft :: Windows',
         "License :: OSI Approved :: MIT License",
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
     ]
 )
