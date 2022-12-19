@@ -45,8 +45,6 @@ app = Flask(__name__)
 OFFLINE_ANALYSIS = lambda source, half, tracking: \
     f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --save-txt --save-conf --img-size 640 {tracking}'
 
-ANALYSIS_BASE = None
-
 def get_sub_analysis(base_dir, data_type, start=0, end=0):
     """Retrieves analysis data for specific data type for a video source."""
     print("start, end:", start, end)
@@ -86,9 +84,9 @@ def get_analysis(base_dir, start=0, end=0):
 
 def get_experiment(stream):
     """Retrieves the most recent video analysis folder for a video source."""
-    experiments = os.listdir(ANALYSIS_BASE)
+    experiments = os.listdir(FLAGS.analysis_dir)
     found = [os.path.exists(
-                os.path.join(ANALYSIS_BASE, f"{exp_dir}/", f"{stream}.mp4"))
+                os.path.join(FLAGS.analysis_dir, f"{exp_dir}/", f"{stream}.mp4"))
              for exp_dir in experiments]
     data = zip(experiments, found)
     data = [exp for exp, found in data if found]
@@ -108,7 +106,7 @@ def download():
         if len(experiment) == 0:
             return jsonify(f"Video has not been analysed: {stream}"), 400
         experiment   = experiment[-1]
-        analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
+        analysis_dir = os.path.join(FLAGS.analysis_dir, f"{experiment}/", "labels/")
         destination  = args.get("destination")
         if os.path.exists(destination):
             return jsonify("File already exists!")
@@ -137,7 +135,7 @@ def analysis():
         data_type    = args.get("data_type")
         start        = args.get("start") if "start" in args else -1
         end          = args.get("end")   if "end" in args else -1
-        analysis_dir = os.path.join(ANALYSIS_BASE, f"{experiment}/", "labels/")
+        analysis_dir = os.path.join(FLAGS.analysis_dir, f"{experiment}/", "labels/")
 
         if data_type == "all":
             data = get_analysis(analysis_dir, int(start), int(end))
@@ -166,10 +164,10 @@ def init():
         args = list(filter(None, OFFLINE_ANALYSIS(source, half, tracking).split(" ")))
 
         logging.info(args)
-        subprocess.Popen(
+        subprocess.run(
             args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            #stdout=subprocess.PIPE,
+            #stderr=subprocess.PIPE,
             cwd=os.getcwd())
 
         return jsonify("Video stream analysis successfully started")
@@ -182,7 +180,6 @@ def get():
     return jsonify("Hiya!")
 
 def main(unused_argv):
-    ANALYSIS_BASE = FLAGS.analysis_dir
     app.run(host=FLAGS.host, port=FLAGS.port)
 
 def entry_point():

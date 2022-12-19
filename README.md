@@ -33,7 +33,7 @@ python -m pip install --upgrade MEng-Team-Project-ML
 To run the microservice, run the following code:
 
 ```bash
-python -m traffic_ml.bin.microservice --analysis_dir "./yolov7-segmentation/runs/predicted-seg/"
+python -m traffic_ml.bin.microservice --analysis_dir "./yolov7-segmentation/runs/predict-seg/"
 ```
 
 ## TODO
