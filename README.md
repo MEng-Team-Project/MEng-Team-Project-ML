@@ -25,7 +25,9 @@ doing the following:
 
 ```bash
 git clone https://github.com/MEng-Team-Project/MEng-Team-Project-ML
-python -m pip install --upgrade MEng-Team-Project-ML
+python -m pip install -e MEng-Team-Project-ML/
+git submodule init
+git submodule update
 ```
 
 ## Run the Microservice
