@@ -129,6 +129,7 @@ dmypy.json
 
 # Ignore PyTorch model checkpoints
 *.pt
+!yolov7-seg.pt
 
 # Ignore TFL JamCam targets and metadata
 targets.txt
