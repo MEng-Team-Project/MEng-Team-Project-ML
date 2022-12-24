@@ -137,3 +137,6 @@ metadata.json
 
 # Ignore testing .mp4s at root level
 *.mp4
+
+# Ignore testing .db files
+*.db
