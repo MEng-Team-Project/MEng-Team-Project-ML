@@ -19,12 +19,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Bulk scrape an entire directory of traffic video footage to identify vehicles,
-count each category of vehicle and to track the routes of those vehicles
-through traffic routes / junctions."""
+"""Bulk scrape an entire directory for its mp4 video files and extract
+the object detections and ClassySORT object tracking information."""
 
 import os
-import time
+
+import numpy as np
+
 from absl import app
 from absl import flags
 
@@ -35,6 +36,8 @@ from ultralytics.yolo.v8.detect.predict import DetectionPredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.configs import get_config
+
+from traffic_ml.lib.sort_count import Sort
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("video_dir", None, "Directory of video files to bulk analyse")
@@ -48,32 +51,73 @@ def main(unused_argv):
     videos    = os.listdir(video_dir)
     videos    = [video for video in videos
                  if video.endswith(".mp4")]
-    print(video_dir, videos)
+    # print(video_dir, videos)
 
     # Load the model
     cfg = get_config(DEFAULT_CONFIG)
-    # cfg.source = video_dir
     cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)
     predictor = DetectionPredictor(cfg)
-    predictor.setup(
-        source=os.path.join(video_dir, videos[0]),
-        model="yolov8x.pt")
     
-    predictor.predict_cli()
+    # Initialise SORT
+    sort_max_age = 5 
+    sort_min_hits = 2
+    sort_iou_thresh = 0.2
+    sort_tracker = Sort(max_age=sort_max_age,
+                        min_hits=sort_min_hits,
+                        iou_threshold=sort_iou_thresh)
 
-    """
+    # Print log output
+    log = False
+
     # model = YOLO("yolov8n.pt")
     for i, video in enumerate(videos):
         print(video)
         
         # Use the model
         source  = os.path.join(video_dir, video)
-        results = predictor(source) # batch
+        results = predictor.__call__(
+            source,
+            model="yolov8n.pt",
+            return_outputs=True,
+            log=False) # batch
 
-        for result in results:
+        for frame_idx, result in enumerate(results):
+            frame_idx += 1
+            
             # format per det (x1, y1, x2, y2, conf, cls)
-            pass # print(result)
-    """
+            # print(result)
+            dets = result["det"]
+            print("det count:", len(dets))
+
+            dets_to_sort = np.empty((0,6))
+            if len(dets.shape) == 1:
+                dets = np.expand_dims(dets, axis=0)
+            for x1,y1,x2,y2,conf,detclass in dets[:, :6]:
+                dets_to_sort = np.vstack((dets_to_sort, 
+                                np.array([x1, y1, x2, y2, 
+                                            conf, detclass])))
+            tracked_dets = sort_tracker.update(dets_to_sort)
+            tracks       = sort_tracker.getTrackers()
+            if log and frame_idx < 3: # 2nd frame
+                print("tracked_dets:", tracked_dets)
+                print("tracks:")
+            for track in tracks:
+                centroids = track
+                track_out = [[
+                    centroids.centroids[i][0],
+                    centroids.centroids[i][1],
+                    centroids.centroids[i+1][0],
+                    centroids.centroids[i+1][1]
+                ]
+                for i, _ in  enumerate(centroids.centroids)
+                if i < len(centroids.centroids)-1]
+                if log and frame_idx < 3: # 2nd frame
+                    print("track->centroids:", track_out)
+
+            for i, det in enumerate(dets):
+                if log and frame_idx < 3: # 2nd frame
+                    print("det", frame_idx, det)
+                
 
 def entry_point():
     app.run(main)
