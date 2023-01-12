@@ -55,25 +55,31 @@ def main(unused_argv):
     # cfg.source = video_dir
     cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)
     predictor = DetectionPredictor(cfg)
+    """
     predictor.setup(
         source=os.path.join(video_dir, videos[0]),
-        model="yolov8x.pt")
-    
-    predictor.predict_cli()
-
+        model="yolov8n.pt") # yolov8x.pt
     """
+
+    # predictor.predict_cli()
+    
     # model = YOLO("yolov8n.pt")
     for i, video in enumerate(videos):
         print(video)
         
         # Use the model
         source  = os.path.join(video_dir, video)
-        results = predictor(source) # batch
+        results = predictor.__call__(
+            source,
+            model="yolov8n.pt",
+            return_outputs=True) # batch
 
-        for result in results:
+        for frame_idx, result in enumerate(results):
             # format per det (x1, y1, x2, y2, conf, cls)
-            pass # print(result)
-    """
+            # print(result)
+            dets = result["det"]
+            for det in dets:
+                print(frame_idx, det)
 
 def entry_point():
     app.run(main)
