@@ -63,6 +63,8 @@ from ultralytics.yolo.utils.checks import check_file, check_imgsz, check_imshow
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("video_dir", None, "Directory of video files to bulk analyse")
+flags.DEFINE_integer("batch_size", 1, "Batch size during inference")
+flags.DEFINE_bool("trk", False, "Whether or not to enable object tracking")
 
 class ParaLoadImages:
     # YOLOv5 image/video dataloader, i.e. `python detect.py --source image.jpg/vid.mp4`
@@ -118,7 +120,7 @@ class ParaLoadImages:
             for _ in range(self.vid_stride):
                 self.cap.grab()
             ret_val, im0 = self.cap.retrieve()
-            print("__next im0 shape:", im0.shape)
+            # print("__next im0 shape:", im0.shape)
             while not ret_val:
                 self.count += 1
                 self.cap.release()
@@ -165,7 +167,7 @@ class ParaLoadImages:
         self.frame = 0
         self.cap = cv2.VideoCapture(path)
         self.frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) / self.vid_stride)
-        print("cv2.CAP_PROP_FRAME_COUNT, self.vid_stride, self.frames:", self.cap.get(cv2.CAP_PROP_FRAME_COUNT), self.vid_stride, self.frames)
+        # print("cv2.CAP_PROP_FRAME_COUNT, self.vid_stride, self.frames:", self.cap.get(cv2.CAP_PROP_FRAME_COUNT), self.vid_stride, self.frames)
         self.orientation = int(self.cap.get(cv2.CAP_PROP_ORIENTATION_META))  # rotation degrees
         # self.cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)  # disable https://github.com/ultralytics/yolov5/issues/8493
 
@@ -211,39 +213,22 @@ class ParaDetectionPredictor(DetectionPredictor):
         # BENCHMARKING
         self.total_infer = 0
 
+    def postprocess(self, preds, img, orig_img):
+        preds = ops.non_max_suppression(preds,
+                                        self.args.conf,
+                                        self.args.iou,
+                                        agnostic=self.args.agnostic_nms,
+                                        max_det=self.args.max_det)
+        for i, pred in enumerate(preds):
+            shape = orig_img[i].shape # if self.webcam else orig_img.shape
+            pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], shape).round()
+
+        return preds
+
     def write_results(self, idx, preds): # , batch):
-        #p, im, im0 = batch
-
-        """
-        log_string = ""
-        if len(im.shape) == 3:
-            im = im[None]  # expand for batch dim
-        """
         self.seen += 1
-        """
-        im0 = im0.copy()
-        if self.webcam:  # batch_size >= 1
-            log_string += f'{idx}: '
-            frame = self.dataset.count
-        else:
-            frame = getattr(self.dataset, 'frame', 0)
-
-        self.data_path = p
-        # save_path = str(self.save_dir / p.name)  # im.jpg
-        self.txt_path = str(self.save_dir / 'labels' / p.stem) + ('' if self.dataset.mode == 'image' else f'_{frame}')
-        log_string += '%gx%g ' % im.shape[2:]  # print string
-        self.annotator = self.get_annotator(im0)
-        """
         
         det = preds[idx]
-        """
-        #print("FINAL DET:", det)
-        if len(det) == 0:
-            return log_string
-        for c in det[:, 5].unique():
-            n = (det[:, 5] == c).sum()  # detections per class
-            log_string += f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}, "
-        """
         if self.return_outputs:
             if "det" not in self.output:
                 self.output["det"] = []
@@ -256,7 +241,6 @@ class ParaDetectionPredictor(DetectionPredictor):
         # source
         source = str(source if source is not None else self.args.source)
         is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
-        # print("ELLO PATH GEEZ:", source, Path(source), type(source), type(Path(source)))
         is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
         webcam = source.isnumeric() or source.endswith('.streams') or (is_url and not is_file)
         screenshot = source.lower().startswith('screen')
@@ -325,31 +309,15 @@ class ParaDetectionPredictor(DetectionPredictor):
             # Inference
             with self.dt[1]:
                 preds = model(im, augment=self.args.augment, visualize=visualize)
+                # print("FIRST PRED B4:", preds)
 
             # postprocess
             with self.dt[2]:
                 preds = self.postprocess(preds, im, im0s)
 
-            # print("len(im):", len(im), "len(im0s):", len(im0s))
             for i in range(len(im)):
-                #print("RETURN IM DATA (idx):", i)
-                #print(preds[i])
-                """
-                if self.webcam:
-                    path, im0s = path[i], im0s[i]
-                """
-                # path, im0s = path[i], im0s[i]
-                #path, im0s = "", im0s[i]
                 p = Path(path)
-                s += self.write_results(i, preds) # , (p, im, im0s))
-
-                #if self.args.show:
-                #    self.show(p)
-
-                """
-                if self.args.save:
-                    self.save_preds(vid_cap, i, str(self.save_dir / p.name))
-                """
+                s += self.write_results(i, preds)
 
             if self.return_outputs:
                 # print("len(self.output):", len(self.output))
@@ -379,16 +347,21 @@ class ParaDetectionPredictor(DetectionPredictor):
         self.run_callbacks("on_predict_end")
 
 def main(unused_argv):
+    track_tm = ops.Profile()
+
     video_dir = FLAGS.video_dir
     videos    = os.listdir(video_dir)
     videos    = [video for video in videos
                  if video.endswith(".mp4")]
     # print(video_dir, videos)
 
-    # Load the model
+    # DEBUG
+    log = False
+    trk = False
+    batch_size = 32
     cfg = get_config(DEFAULT_CONFIG)
     cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)
-    predictor = ParaDetectionPredictor(cfg, batch_size=64)
+    predictor = ParaDetectionPredictor(cfg, batch_size=batch_size)
     
     # Initialise SORT
     sort_max_age    = 5
@@ -397,10 +370,7 @@ def main(unused_argv):
     sort_tracker    = Sort(max_age=sort_max_age,
                         min_hits=sort_min_hits,
                         iou_threshold=sort_iou_thresh)
-
-    # Print log output
-    log = False
-
+    
     # model = YOLO("yolov8n.pt")
     for i, video in enumerate(videos):
         print(video)
@@ -413,44 +383,43 @@ def main(unused_argv):
             return_outputs=True,
             log=True) # batch
 
-        print("results:", results)
         for frame_idx, result in enumerate(results):
             frame_idx += 1
 
-            det = result["det"]
-            print("det count:", [len(det) for det in det])
-            """
-            dets_to_sort = np.empty((0,6))
-            if len(dets.shape) == 1:
-                dets = np.expand_dims(dets, axis=0)
-            for x1,y1,x2,y2,conf,detclass in dets[:, :6]:
-                dets_to_sort = np.vstack((dets_to_sort, 
-                                np.array([x1, y1, x2, y2, 
-                                            conf, detclass])))
-            tracked_dets = sort_tracker.update(dets_to_sort)
-            tracks       = sort_tracker.getTrackers()
+            dets_s = result["det"]
+            if trk:
+                for dets in dets_s:
+                    dets_to_sort = np.empty((0,6))
+                    if len(dets.shape) == 1:
+                        dets = np.expand_dims(dets, axis=0)
+                    for x1,y1,x2,y2,conf,detclass in dets[:, :6]:
+                        dets_to_sort = np.vstack((dets_to_sort, 
+                                        np.array([x1, y1, x2, y2, 
+                                                    conf, detclass])))
+                    tracked_dets = sort_tracker.update(dets_to_sort)
+                    tracks       = sort_tracker.getTrackers()
 
-            if log and frame_idx < 3: # 2nd frame
-                print("tracked_dets:", tracked_dets)
-                print("tracks:")
+                    if log and frame_idx < 3: # 2nd frame
+                        print("tracked_dets:", tracked_dets)
+                        print("tracks:")
 
-            for track in tracks:
-                centroids = track
-                track_out = [[
-                    centroids.centroids[i][0],
-                    centroids.centroids[i][1],
-                    centroids.centroids[i+1][0],
-                    centroids.centroids[i+1][1]
-                ]
-                for i, _ in  enumerate(centroids.centroids)
-                if i < len(centroids.centroids)-1]
-                if log and frame_idx < 3: # 2nd frame
-                    print("track->centroids:", track_out)
+                    for track in tracks:
+                        centroids = track
+                        track_out = [[
+                            centroids.centroids[i][0],
+                            centroids.centroids[i][1],
+                            centroids.centroids[i+1][0],
+                            centroids.centroids[i+1][1]
+                        ]
+                        for i, _ in  enumerate(centroids.centroids)
+                        if i < len(centroids.centroids)-1]
+                        if log and frame_idx < 3: # 2nd frame
+                            print("track->centroids:", track_out)
 
-            for i, det in enumerate(dets):
-                if log and frame_idx < 3: # 2nd frame
-                    print("det", frame_idx, det)
-            """
+                    for i, det in enumerate(dets):
+                        if log and frame_idx < 3: # 2nd frame
+                            print("det", frame_idx, det)
+            
 def entry_point():
     app.run(main)
 
