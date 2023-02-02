@@ -54,17 +54,26 @@ import cv2
 from threading import Thread
 from urllib.parse import urlparse
 
+from dotenv import dotenv_values
+import neptune.new as neptune
+
 from pathlib import Path
-from traffic_ml.lib.sort_count import Sort
+# from traffic_ml.lib.sort_count import Sort
+from sort_count import Sort
 
 import torch
+torch.backends.cudnn.benchmark = False
 
 from ultralytics.yolo.utils.checks import check_file, check_imgsz, check_imshow
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("video_dir", None, "Directory of video files to bulk analyse")
+flags.DEFINE_string("model", "yolov8n.pt", "Pre-trained YoloV8 model")
+flags.DEFINE_string("exp", "", "(Optional) Experiment name")
 flags.DEFINE_integer("batch_size", 1, "Batch size during inference")
+flags.DEFINE_integer("imgsz", 640, "NxN image size reshaping for Yolov8 object detection")
 flags.DEFINE_bool("trk", False, "Whether or not to enable object tracking")
+flags.mark_flag_as_required("video_dir")
 
 class ParaLoadImages:
     # YOLOv5 image/video dataloader, i.e. `python detect.py --source image.jpg/vid.mp4`
@@ -206,12 +215,13 @@ def create_batch(dataset, batch_size=1):
 
 # Batched inputs
 class ParaDetectionPredictor(DetectionPredictor):
-    def __init__(self, config=DEFAULT_CONFIG, overrides=None, batch_size=1):
+    def __init__(self, config=DEFAULT_CONFIG, overrides=None, batch_size=1, run=None):
         super().__init__(config, overrides)
         self.batch_size = batch_size
 
         # BENCHMARKING
         self.total_infer = 0
+        self.run = run
 
     def postprocess(self, preds, img, orig_img):
         preds = ops.non_max_suppression(preds,
@@ -278,6 +288,7 @@ class ParaDetectionPredictor(DetectionPredictor):
 
     @smart_inference_mode()
     def __call__(self, source=None, model=None, return_outputs=True, log=True):
+        run = self.run
         print("My custom __call__")
         self.run_callbacks("on_predict_start")
         model = self.model if self.done_setup else self.setup(source, model, return_outputs)
@@ -334,6 +345,12 @@ class ParaDetectionPredictor(DetectionPredictor):
         # Print results
         
         t = tuple(x.t / self.seen * 1E3 for x in self.dt)  # speeds per image
+        self.t = list(t)
+        run["mean_pre_process_ms"]   = self.t[0]
+        run["mean_infer_ms"]         = self.t[1]
+        run["mean_post_process_ms"]  = self.t[2]
+        run["total_infer_ms"]        = self.total_infer
+
         if log:
             LOGGER.info(
                 f'Speed: %.1fms pre-process, %.1fms inference, %.1fms postprocess per image at shape {(1, 3, *self.imgsz)}'
@@ -347,6 +364,15 @@ class ParaDetectionPredictor(DetectionPredictor):
         self.run_callbacks("on_predict_end")
 
 def main(unused_argv):
+    config  = dotenv_values(".env")
+    project = config["NEPTUNE_NAME"]
+    key     = config["NEPTUNE_KEY"]
+
+    run = neptune.init_run(
+        project=project,
+        api_token=key)
+
+    track_total = []
     track_tm = ops.Profile()
 
     video_dir = FLAGS.video_dir
@@ -357,11 +383,20 @@ def main(unused_argv):
 
     # DEBUG
     log = False
-    trk = False
-    batch_size = 32
+    trk = FLAGS.trk
+    batch_size = FLAGS.batch_size
+    model = FLAGS.model
+    imgsz = FLAGS.imgsz
+    exp = FLAGS.exp
+    run["model"] = model
+    run["batch_size"] = batch_size
+    run["trk"] = trk
+    run["imgsz"] = imgsz
+    run["exp"] = exp
+    run["name"] = f"bs_{batch_size}_trk_{trk}_imgsz_{imgsz}"
     cfg = get_config(DEFAULT_CONFIG)
-    cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)
-    predictor = ParaDetectionPredictor(cfg, batch_size=batch_size)
+    cfg.imgsz = check_imgsz(imgsz, min_dim=2)
+    predictor = ParaDetectionPredictor(cfg, batch_size=batch_size, run=run)
     
     # Initialise SORT
     sort_max_age    = 5
@@ -379,7 +414,7 @@ def main(unused_argv):
         source  = os.path.join(video_dir, video)
         results = predictor.__call__(
             source,
-            model="yolov8n.pt",
+            model=model,
             return_outputs=True,
             log=True) # batch
 
@@ -389,37 +424,44 @@ def main(unused_argv):
             dets_s = result["det"]
             if trk:
                 for dets in dets_s:
-                    dets_to_sort = np.empty((0,6))
-                    if len(dets.shape) == 1:
-                        dets = np.expand_dims(dets, axis=0)
-                    for x1,y1,x2,y2,conf,detclass in dets[:, :6]:
-                        dets_to_sort = np.vstack((dets_to_sort, 
-                                        np.array([x1, y1, x2, y2, 
-                                                    conf, detclass])))
-                    tracked_dets = sort_tracker.update(dets_to_sort)
-                    tracks       = sort_tracker.getTrackers()
+                    with track_tm:
+                        dets_to_sort = np.empty((0,6))
+                        if len(dets.shape) == 1:
+                            dets = np.expand_dims(dets, axis=0)
+                        for x1,y1,x2,y2,conf,detclass in dets[:, :6]:
+                            dets_to_sort = np.vstack((dets_to_sort, 
+                                            np.array([x1, y1, x2, y2, 
+                                                        conf, detclass])))
+                        tracked_dets = sort_tracker.update(dets_to_sort)
+                        tracks       = sort_tracker.getTrackers()
 
-                    if log and frame_idx < 3: # 2nd frame
-                        print("tracked_dets:", tracked_dets)
-                        print("tracks:")
-
-                    for track in tracks:
-                        centroids = track
-                        track_out = [[
-                            centroids.centroids[i][0],
-                            centroids.centroids[i][1],
-                            centroids.centroids[i+1][0],
-                            centroids.centroids[i+1][1]
-                        ]
-                        for i, _ in  enumerate(centroids.centroids)
-                        if i < len(centroids.centroids)-1]
                         if log and frame_idx < 3: # 2nd frame
-                            print("track->centroids:", track_out)
+                            print("tracked_dets:", tracked_dets)
+                            print("tracks:")
 
-                    for i, det in enumerate(dets):
-                        if log and frame_idx < 3: # 2nd frame
-                            print("det", frame_idx, det)
-            
+                        for track in tracks:
+                            centroids = track
+                            track_out = [[
+                                centroids.centroids[i][0],
+                                centroids.centroids[i][1],
+                                centroids.centroids[i+1][0],
+                                centroids.centroids[i+1][1]
+                            ]
+                            for i, _ in  enumerate(centroids.centroids)
+                            if i < len(centroids.centroids)-1]
+                            if log and frame_idx < 3: # 2nd frame
+                                print("track->centroids:", track_out)
+
+                        for i, det in enumerate(dets):
+                            if log and frame_idx < 3: # 2nd frame
+                                print("det", frame_idx, det)
+                    track_total.append(track_tm.dt * 1E3)
+
+    run["mean_track_ms"] = sum(track_total) / len(track_total)
+    run["total_track_ms"] = sum(track_total)
+
+    run.stop()
+    
 def entry_point():
     app.run(main)
 
