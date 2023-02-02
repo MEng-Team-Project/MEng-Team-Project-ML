@@ -67,7 +67,7 @@ def main(unused_argv):
                         iou_threshold=sort_iou_thresh)
 
     # Print log output
-    log = False
+    log = True
 
     # model = YOLO("yolov8n.pt")
     for i, video in enumerate(videos):
@@ -88,7 +88,7 @@ def main(unused_argv):
             # print(result)
             dets = result["det"]
             print("det count:", len(dets))
-
+            print(dets[0])
             dets_to_sort = np.empty((0,6))
             if len(dets.shape) == 1:
                 dets = np.expand_dims(dets, axis=0)

@@ -250,6 +250,7 @@ class Sort(object):
         self.iou_threshold = iou_threshold
         self.trackers = []
         self.frame_count = 0
+        
     def update(self, dets= np.empty((0,6))):
         """
         Parameters:
