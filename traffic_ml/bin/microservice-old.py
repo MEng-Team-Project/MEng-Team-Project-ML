@@ -1,6 +1,6 @@
 # MIT License
 # 
-# Copyright (c) 2022-2023 MEng-Team-Project
+# Copyright (c) 2022 MEng-Team-Project
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal

@@ -89,6 +89,8 @@ python -m traffic_ml.bin.microservice --analysis_dir "./yolov7-segmentation/runs
   user who is viewing our client with real-time route tracking / object recognition.
 -->
 
+
+<!--
 ## YoloV7 Outputs
 
 To move all of yolov7's predicted outputs from it's individual experimental
@@ -98,9 +100,24 @@ do this (assumes bash like terminal, you can use MinGW or WSL on Windows).
 ```bash
 cp .../predict-seg/**/*.mp4 .../destination
 ```
+-->
 
 ## Notebooks
 
-- `main.ipynb` Analysis of the initial JSON files produced in the original
-  draft version of our proposed model. Notebook contains code used to determine
-  road routes, code used to calculate counts of object types along routes, etc.
+- `1. JSON Attempt.ipynb.ipynb` Analysis of the initial JSON files produced
+  in the original draft version of our proposed model. Notebook contains
+  code used to determine road routes, code used to calculate counts of
+  object types along routes, etc.
+- `2. SQLite3 Attempt.ipynb` Changed recording of analytics from YOLOv7
+  and ClassySORT to use SQLite3 as the recorded format. This saved
+  information was extremely raw and ill conceived as it required
+  complex and difficult post-processing to get any kind of useful
+  information from.
+- `3. SQLite3 StrongSORT.ipynb` Switched from YOLOv7 to YOLOv8 and
+  switched object tracking algorithm from SORT to StrongSORT which
+  gigantically improves performance. StrongSORT has a lower IDs
+  (identity switching) rate compared to SORT of 4470 compared to
+  1066, respectively on MOT20 [ref](https://github.com/dyhBUPT/StrongSORT).
+  This means that the SORT algorithm is identifying 4.19x more objects
+  than StrongSORT so it's association between detections and tracking
+  the same object across time is highly unstable.
