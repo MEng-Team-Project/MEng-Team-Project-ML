@@ -43,7 +43,7 @@ git submodule update
       - datetime: start  `Start Datetime to get data for`
       - datetime: end    `End Datetime to get data for`
   - res
-    - body
+    - body (JSON)
       - List[detection]:
         - detection{}
           - frame  (Video frame index, 1-indexed)
@@ -55,6 +55,13 @@ git submodule update
           - label (COCO Class Label)
           - conf (Prediction confidence)
           - det_id (Unique Detection ID across video)
+- GET: `localhost:6000/api/download`
+  - req
+    - param:
+      - str: stream `StreamID to download analytics data for`
+      - str: dest   `Destination path to download analytics information to`
+  - res
+    - blob (JSON): JSON file in format described in `api/analysis` endpoint
 
 ## Run the Microservice
 
