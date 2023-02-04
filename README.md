@@ -30,6 +30,32 @@ git submodule init
 git submodule update
 ```
 
+### Endpoint List
+
+- POST: `localhost:6000/api/init`
+  - req
+    - body
+      - str: source `Absolute video stream path`
+- GET: `localhost:6000/api/analysis`
+  - req
+    - param
+      - str:      stream `StreamID to get analytics data for`
+      - datetime: start  `Start Datetime to get data for`
+      - datetime: end    `End Datetime to get data for`
+  - res
+    - body
+      - List[detection]:
+        - detection{}
+          - frame  (Video frame index, 1-indexed)
+          - bbox_x (Detection bounding box, X-offset from left)
+          - bbox_y (Detection bounding box, Y-offset from top)
+          - bbox_w (Detection bounding box, width in pixels)
+          - bbox_h (Detection bounding box, height in pixels)
+          - cls (COCO Class Index, 1-indexed)
+          - label (COCO Class Label)
+          - conf (Prediction confidence)
+          - det_id (Unique Detection ID across video)
+
 ## Run the Microservice
 
 To run the microservice, run the following code:
@@ -52,8 +78,9 @@ python -m traffic_ml.bin.microservice --analysis_dir "./yolov7-segmentation/runs
    - [x] Bus (Detect Objects in Bus Lane)
       - Camera ID: 03752, contains a bus stop. This is used as the test set.
       - [Requirement](https://docs.google.com/document/d/1Q0TwboSrRgvXywVp9VgA9of2G4NjYQBYJ2YSKbkoS-o/edit#bookmark=id.hnc674tzl7ba)
-   - [ ] HGV
    - [x] People (This is tested throughout the day time and night time datasets)
+   - [ ] HGV
+      - YOLOv8 not currently fine-tuned for HGVs yet.
 
 ## File Formats
 
