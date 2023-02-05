@@ -29,6 +29,7 @@ import subprocess
 from pathlib import Path
 import pandas as pd
 import sqlite3
+import json
 
 from flask import Flask, request, jsonify
 
@@ -49,20 +50,87 @@ OFFLINE_ANALYSIS = lambda source, analysis_path, half: \
 
 @app.route("/api/analysis/", methods=["POST"])
 def analysis():
-    """Get analytical information of a video stream.
+    """Get count and route analytical information of a video stream.
     
     args:
-        stream - Stream ID to get data for.
+        stream  - Stream ID to get data for.
+        raw     - (Optional) Provide the raw detection information in the result
+        start   - (Optional) Start frame
+        end     - (Optional) End frame
+        classes - (Optional) List of COCO class labels to filter detections by
+        trk_fmt - (Optional) Either `first_last` or `entire`. This will either
+                  include the first and last anchor points for an object in the
+                  route, or it will include the entire route for the requested
+                  portion of the video. By default, returns `first_last`.
+
     """
     try:
-        args          = request.args
-        stream        = args.get("stream")
+        # Get stream ID
+        content = request.json
+        stream  = content["stream"]
+        print("api/analysis->content:", content)
+
+        # Get SQLite detection data
         analysis_path = Path(FLAGS.analysis_dir) / f"{stream}.db"
         con = sqlite3.connect(analysis_path)
         detections_df = pd.read_sql_query("SELECT * FROM detection;", con)
-        data = detections_df.to_json(orient="records")
         con.close()
-        return jsonify(data)
+
+        # (Optional) Apply start and end frame filters
+        data = detections_df
+        if "start" in content:
+            data = data[data["frame"] >= content["start"]]
+        if "end" in content:
+            data = data[data["frame"] <= content["end"]]
+        if "classes" in content:
+            classes = content["classes"]
+            data    = data[data["label"].isin(classes)]
+        
+        # Get and extract count information for each (label, det_id) tuple
+        counts = data.groupby('label')['det_id'].nunique().reset_index(name='count')
+
+        # Get route information for each (label, det_id) tuple
+        routes_df = data[["frame", "label", "det_id", "bbox_x", "bbox_y", "bbox_w", "bbox_h"]].copy()
+        routes_df["anchor_x"] = routes_df.apply(
+            lambda row: row["bbox_x"] + (row["bbox_w"] / 2.0), axis=1)
+        routes_df["anchor_y"] = routes_df.apply(
+            lambda row: row["bbox_y"] + (row["bbox_h"] / 2.0), axis=1)
+
+        # Extract first and last or all anchor positions for each (label, det_id) tuple
+        trk_fmt = "first_last"
+        if "trk_fmt" in content:
+            if content["trk_fmt"] == "entire":
+                trk_fmt = "entire"
+        def get_values(group, trk_fmt):
+            vals = group[['anchor_x', 'anchor_y']].values.tolist()
+            if trk_fmt == "first_last":
+                vals = [vals[0], vals[-1]]
+            vals = [{"x": val[0], "y": val[1]} for val in vals]
+            return vals
+        routes = routes_df.groupby(['label', 'det_id']).apply(
+                    lambda group: get_values(group, trk_fmt))
+
+        # Reset the index of the resulting series to remove the MultiIndex
+        routes = routes.reset_index()
+
+        # Replace the MultiIndex label column names with 'label' and 'det_id'
+        routes.rename(columns={0: 'routes'}, inplace=True)
+        routes.rename(columns={'level_0': 'label', 'level_1': 'det_id'}, inplace=True)
+
+        # Create a dictionary with 'label' as the key and 'routes' as the value
+        route_dict = routes.groupby('label')['routes'].apply(list).to_dict()
+
+        # Separate raw data and analytical data
+        final_data = {
+            "counts": json.loads(counts.to_json(orient="records")),
+            "routes": route_dict
+        }
+
+        if "raw" in content:
+            if content["raw"] == True:
+                final_data["raw"] = json.loads(data.to_json(orient="records"))
+
+        return jsonify(final_data)
     except Exception as e:
         return jsonify("Error:", str(e)), 400
 
