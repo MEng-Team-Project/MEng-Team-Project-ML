@@ -1,6 +1,6 @@
 # MIT License
 # 
-# Copyright (c) 2022 MEng-Team-Project
+# Copyright (c) 2022-2023 MEng-Team-Project
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,9 @@ and people."""
 import logging
 import os
 import subprocess
+from pathlib import Path
+import pandas as pd
+import sqlite3
 import json
 
 from flask import Flask, request, jsonify
@@ -36,134 +39,130 @@ from absl import flags
 FLAGS = flags.FLAGS
 flags.DEFINE_string ("host", "localhost", "Host IP")
 flags.DEFINE_integer("port", 6000, "Host port")
-flags.DEFINE_string ("analysis_dir", None, "Directory which yolo model is storing analysis outputs")
+flags.DEFINE_string ("analysis_dir", None, "Directory to save analysis DBs to")
 
 flags.mark_flag_as_required("analysis_dir")
 
 app = Flask(__name__)
 
-OFFLINE_ANALYSIS = lambda source, half, tracking: \
-    f'python yolov7-segmentation/segment/predict.py --weights ./yolov7-seg.pt --source {source} --{half} --save-txt --save-conf --img-size 640 {tracking}'
+OFFLINE_ANALYSIS = lambda source, analysis_path, half: \
+    f'python yolov8_tracking/track.py --source {source} --save-vid --save-trajectories --yolo-weights yolov8l.pt --tracking-method strongsort --analysis_db_path {analysis_path} {"--half" if half else ""}'
 
-def get_sub_analysis(base_dir, data_type, start=0, end=0):
-    """Retrieves analysis data for specific data type for a video source."""
-    print("start, end:", start, end)
-    suffix = data_type if data_type else ""
-    fi_s = list(filter(lambda x: suffix in x, os.listdir(base_dir)))
-    fi_s = [os.path.join(base_dir, fi) for fi in fi_s]
-    fi_s = sorted(fi_s, key=len)
-    fi_s_s = []
-    for i, fi in enumerate(fi_s):
-        idx = int(fi.split("_")[-1].split(".")[0])
-        if start > 0:
-            if idx < start:
-                continue
-        if end > 0:
-            if idx > end:
-                continue
-        with open(fi) as f:
-            if data_type:
-                data = "".join(list(filter(None, f.read().split("\n"))))
-            else:
-                data = "[" + ",".join(list(filter(None, f.read().split("\n")))) + "]"
-            d = json.loads(data)
-            d["frame"] = idx
-        fi_s_s.append(d)
-    data = json.dumps(fi_s_s)
-    return data
-
-def get_analysis(base_dir, start=0, end=0):
-    """Retrieves all analysis data for a video source."""
-    info_data    = get_sub_analysis(base_dir, "_info", start, end)
-    track_data   = get_sub_analysis(base_dir, "_track", start, end)
-    data = {
-        "info":    info_data,
-        "track":   track_data
-    }
-    return data
-
-def get_experiment(stream):
-    """Retrieves the most recent video analysis folder for a video source."""
-    experiments = os.listdir(FLAGS.analysis_dir)
-    found = [os.path.exists(
-                os.path.join(FLAGS.analysis_dir, f"{exp_dir}/", f"{stream}.mp4"))
-             for exp_dir in experiments]
-    data = zip(experiments, found)
-    data = [exp for exp, found in data if found]
-    return data
-
-@app.route("/api/download/", methods=["GET"])
-def download():
-    """Download all analytical information for a video source.
-    
-    args:
-        stream      - Stream ID to get data for.
-        destination - Local path to download file to."""
-    try:
-        args         = request.args
-        stream       = args.get("stream")
-        experiment   = get_experiment(stream)
-        if len(experiment) == 0:
-            return jsonify(f"Video has not been analysed: {stream}"), 400
-        experiment   = experiment[-1]
-        analysis_dir = os.path.join(FLAGS.analysis_dir, f"{experiment}/", "labels/")
-        destination  = args.get("destination")
-        if os.path.exists(destination):
-            return jsonify("File already exists!")
-
-        data = get_analysis(analysis_dir, 0, 0)
-        with open(destination, "w") as f:
-            f.write(json.dumps(data, indent=4))
-        return jsonify(f"JSON data downloaded to: {destination}")
-    except Exception as e:
-        return jsonify("Error: " + str(e)), 400
-
-@app.route("/api/analysis/", methods=["GET"])
+@app.route("/api/analysis/", methods=["POST"])
 def analysis():
-    """Get analytical information of a video source.
+    """Get count and route analytical information of a video stream.
     
     args:
-        stream     - Stream ID to get data for.
-        data_type  - Data type to retrieve (info, track).
-        start      - (Optional) Start frame to retrieve data from, inclusive.
-        end        - (Optional) End frame to retrieve data to, inclusive."""
+        stream  - Stream ID to get data for.
+        raw     - (Optional) Provide the raw detection information in the result
+        start   - (Optional) Start frame
+        end     - (Optional) End frame
+        classes - (Optional) List of COCO class labels to filter detections by
+        trk_fmt - (Optional) Either `first_last` or `entire`. This will either
+                  include the first and last anchor points for an object in the
+                  route, or it will include the entire route for the requested
+                  portion of the video. By default, returns `first_last`.
+
+    """
     try:
-        args         = request.args
-        stream       = args.get("stream")
-        experiment   = get_experiment(stream)
-        experiment   = experiment[-1]
-        data_type    = args.get("data_type")
-        start        = args.get("start") if "start" in args else -1
-        end          = args.get("end")   if "end" in args else -1
-        analysis_dir = os.path.join(FLAGS.analysis_dir, f"{experiment}/", "labels/")
+        # Get stream ID
+        content = request.json
+        stream  = content["stream"]
+        print("api/analysis->content:", content)
 
-        if data_type == "all":
-            data = get_analysis(analysis_dir, int(start), int(end))
-        else:
-            data = get_sub_analysis(analysis_dir, data_type, int(start), int(end))
+        # Get SQLite detection data
+        analysis_path = Path(FLAGS.analysis_dir) / f"{stream}.db"
+        con = sqlite3.connect(analysis_path)
+        detections_df = pd.read_sql_query("SELECT * FROM detection;", con)
+        metadata_df   = pd.read_sql_query("SELECT * FROM metadata;", con)
+        metadata_df   = metadata_df.iloc[0]
+        if "id" in metadata_df:
+            del metadata_df["id"]
+        con.close()
 
-        return jsonify(data)
+        # (Optional) Apply start and end frame filters
+        data = detections_df
+        if "start" in content:
+            data = data[data["frame"] >= content["start"]]
+        if "end" in content:
+            data = data[data["frame"] <= content["end"]]
+        if "classes" in content:
+            classes = content["classes"]
+            data    = data[data["label"].isin(classes)]
+        
+        # Get and extract count information for each (label, det_id) tuple
+        counts_df = data.groupby('label')['det_id'].nunique().reset_index(name='count')
+        counts    = json.loads(counts_df.to_json(orient="records"))
+
+        # Get route information for each (label, det_id) tuple
+        routes_df = data[["frame", "label", "det_id", "bbox_x", "bbox_y", "bbox_w", "bbox_h"]].copy()
+        routes_df["anchor_x"] = routes_df.apply(
+            lambda row: row["bbox_x"] + (row["bbox_w"] / 2.0), axis=1)
+        routes_df["anchor_y"] = routes_df.apply(
+            lambda row: row["bbox_y"] + (row["bbox_h"] / 2.0), axis=1)
+
+        # Extract first and last or all anchor positions for each (label, det_id) tuple
+        trk_fmt = "first_last"
+        if "trk_fmt" in content:
+            if content["trk_fmt"] == "entire":
+                trk_fmt = "entire"
+        def get_values(group, trk_fmt):
+            vals = group[['frame', 'anchor_x', 'anchor_y']].values.tolist()
+            if trk_fmt == "first_last":
+                vals = [vals[0], vals[-1]]
+            vals = [{"frame:": val[0], "x": val[1], "y": val[2]} for val in vals]
+            return vals
+
+        routes = routes_df.groupby(['label', 'det_id']).apply(
+                    lambda group: get_values(group, trk_fmt))
+
+        # Reset the index of the resulting series to remove the MultiIndex
+        routes = routes.reset_index()
+
+        # Replace the MultiIndex label column names with 'label' and 'det_id'
+        routes.rename(columns={0: 'routes'}, inplace=True)
+        routes.rename(columns={'level_0': 'label', 'level_1': 'det_id'}, inplace=True)
+
+        # Create a dictionary with 'label' as the key and 'routes' as the value
+        route_dict = routes.groupby('label')['routes'].apply(list).to_dict()
+
+        # Convert metadata into dict
+        metadata = json.loads(metadata_df.to_json(orient="index"))
+
+        # Separate raw data and analytical data
+        final_data = {
+            "metadata": metadata,
+            "tracking_format": trk_fmt,
+            "counts": counts,
+            "routes": route_dict
+        }
+
+        if "raw" in content:
+            if content["raw"] == True:
+                final_data["raw"] = json.loads(data.to_json(orient="records"))
+
+        return jsonify(final_data)
     except Exception as e:
         return jsonify("Error:", str(e)), 400
 
 @app.route("/api/init", methods=["POST"])
 def init():
-    """Initiate an analysis of a video source.
+    """Initiate an analysis of a video stream.
     
     args:
-        source   - Absolute video stream source path
-        type     - "online"/"offline" analysis"""
+        stream - Absolute video stream path
+    """
     try:
-        content  = request.json
-        source   = content["source"]
-        half     = True
-        half     = "half" if half else ""
-        tracking = True
-        tracking = "--trk" if tracking else ""
-
-        args = list(filter(None, OFFLINE_ANALYSIS(source, half, tracking).split(" ")))
+        content = request.json
+        stream  = content["stream"]
+        half    = True # Half-Precision Infer
+        analysis_fname = Path(stream).stem
+        analysis_path = Path(FLAGS.analysis_dir) / f"{analysis_fname}.db"
+        args = list(filter(None, OFFLINE_ANALYSIS(stream, analysis_path, half).split(" ")))
 
         logging.info(args)
+
+        # NOTE: Uncomment stdout and stderr for async operation, it's sync by default
         subprocess.run(
             args,
             #stdout=subprocess.PIPE,
@@ -174,10 +173,6 @@ def init():
 
     except Exception as e:
         return jsonify("Error:", str(e)), 400
-
-@app.route("/api/", methods=["GET"])
-def get():
-    return jsonify("Hiya!")
 
 def main(unused_argv):
     app.run(host=FLAGS.host, port=FLAGS.port)

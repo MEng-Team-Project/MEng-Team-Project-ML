@@ -24,8 +24,16 @@ You can install this python package from a local clone of the git repo by
 doing the following:
 
 ```bash
+# Clone and install this repository
 git clone https://github.com/MEng-Team-Project/MEng-Team-Project-ML
 python -m pip install -e MEng-Team-Project-ML/
+
+# Get yolov8_tracking submodule
+git submodule init
+git submodule update
+
+# Get yolov8 submodule for yolov8_tracking
+cd yolov8_tracking
 git submodule init
 git submodule update
 ```
@@ -35,7 +43,7 @@ git submodule update
 To run the microservice, run the following code:
 
 ```bash
-python -m traffic_ml.bin.microservice --analysis_dir "./yolov7-segmentation/runs/predict-seg/"
+python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-Web/server/analysis"
 ```
 
 ## TODO
@@ -52,55 +60,35 @@ python -m traffic_ml.bin.microservice --analysis_dir "./yolov7-segmentation/runs
    - [x] Bus (Detect Objects in Bus Lane)
       - Camera ID: 03752, contains a bus stop. This is used as the test set.
       - [Requirement](https://docs.google.com/document/d/1Q0TwboSrRgvXywVp9VgA9of2G4NjYQBYJ2YSKbkoS-o/edit#bookmark=id.hnc674tzl7ba)
-   - [ ] HGV
    - [x] People (This is tested throughout the day time and night time datasets)
+   - [ ] HGV
+      - YOLOv8 not currently fine-tuned for HGVs yet.
 
 ## File Formats
 
 - Accepts .mp4 source files. This is enforced during video stream
   upload by only accepting .mp4 files and live streams should be converted
-  using either ffmpeg dynamically, or when yolov7 outputs a video it
+  using either ffmpeg dynamically, or when yolov8 outputs a video it
   also needs ffmpeg to convert it to a lower bit-rate .mp4.
 - Also accepts .m3u8 playlist files or .ts HLS livestream video segment files
   for analysing realtime IP video streams.
 
-## Utility Files
-
-- `traffic_ml/bin/check` is designed to verify the analytical information being
-  produced by the forked `yolov7-segmentation` submodule is producing
-  sensible data. If you run the script (after setting the correct
-  parameters within the file), you should find that the `Tracked Detections`
-  is the lowest, followed by the `Segments` and then the `Routes` is the
-  highest. The reason for this is because there are more routes per frame
-  than there are bounding box detections. Then there are more segments
-  than full tracked detections as (I believe) there can be multiple segments
-  per individual object. Then the tracked detections are complete objects
-  which are being tracked by the [Kalman Filter](https://en.wikipedia.org/wiki/Kalman_filter).
-  Run this using:
-  ```bash
-  python -m traffic_ml.bin.check --analysis_dir "" --fname ""
-  ```
-<!--
-- `live_metadata.py` displays the multimedia playlist which informs
-  clients which .ts files (livestream video segments) to download in which order
-  to correctly view the livestream. Useful for understanding how the .ts files
-  should be fed into the microservice for batch processing the videos for
-  analysis when we come to deploy the system for real, and also providing a
-  user who is viewing our client with real-time route tracking / object recognition.
--->
-
-## YoloV7 Outputs
-
-To move all of yolov7's predicted outputs from it's individual experimental
-directories into one single directory, you can use the following command to
-do this (assumes bash like terminal, you can use MinGW or WSL on Windows).
-
-```bash
-cp .../predict-seg/**/*.mp4 .../destination
-```
-
 ## Notebooks
 
-- `main.ipynb` Analysis of the initial JSON files produced in the original
-  draft version of our proposed model. Notebook contains code used to determine
-  road routes, code used to calculate counts of object types along routes, etc.
+- `1. JSON Attempt.ipynb.ipynb` Analysis of the initial JSON files produced
+  in the original draft version of our proposed model. Notebook contains
+  code used to determine road routes, code used to calculate counts of
+  object types along routes, etc.
+- `2. SQLite3 Attempt.ipynb` Changed recording of analytics from YOLOv7
+  and ClassySORT to use SQLite3 as the recorded format. This saved
+  information was extremely raw and ill conceived as it required
+  complex and difficult post-processing to get any kind of useful
+  information from.
+- `3. SQLite3 StrongSORT.ipynb` Switched from YOLOv7 to YOLOv8 and
+  switched object tracking algorithm from SORT to StrongSORT which
+  gigantically improves performance. StrongSORT has a lower IDs
+  (identity switching) rate compared to SORT of 4470 compared to
+  1066, respectively on MOT20 [ref](https://github.com/dyhBUPT/StrongSORT).
+  This means that the SORT algorithm is identifying 4.19x more objects
+  than StrongSORT so it's association between detections and tracking
+  the same object across time is highly unstable.
