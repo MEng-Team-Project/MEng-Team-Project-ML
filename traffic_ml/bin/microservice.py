@@ -102,11 +102,12 @@ def analysis():
             if content["trk_fmt"] == "entire":
                 trk_fmt = "entire"
         def get_values(group, trk_fmt):
-            vals = group[['anchor_x', 'anchor_y']].values.tolist()
+            vals = group[['frame', 'anchor_x', 'anchor_y']].values.tolist()
             if trk_fmt == "first_last":
                 vals = [vals[0], vals[-1]]
-            vals = [{"x": val[0], "y": val[1]} for val in vals]
+            vals = [{"frame:": val[0], "x": val[1], "y": val[2]} for val in vals]
             return vals
+
         routes = routes_df.groupby(['label', 'det_id']).apply(
                     lambda group: get_values(group, trk_fmt))
 
