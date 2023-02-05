@@ -74,6 +74,10 @@ def analysis():
         analysis_path = Path(FLAGS.analysis_dir) / f"{stream}.db"
         con = sqlite3.connect(analysis_path)
         detections_df = pd.read_sql_query("SELECT * FROM detection;", con)
+        metadata_df   = pd.read_sql_query("SELECT * FROM metadata;", con)
+        metadata_df   = metadata_df.iloc[0]
+        if "id" in metadata_df:
+            del metadata_df["id"]
         con.close()
 
         # (Optional) Apply start and end frame filters
@@ -87,7 +91,8 @@ def analysis():
             data    = data[data["label"].isin(classes)]
         
         # Get and extract count information for each (label, det_id) tuple
-        counts = data.groupby('label')['det_id'].nunique().reset_index(name='count')
+        counts_df = data.groupby('label')['det_id'].nunique().reset_index(name='count')
+        counts    = json.loads(counts_df.to_json(orient="records"))
 
         # Get route information for each (label, det_id) tuple
         routes_df = data[["frame", "label", "det_id", "bbox_x", "bbox_y", "bbox_w", "bbox_h"]].copy()
@@ -121,9 +126,14 @@ def analysis():
         # Create a dictionary with 'label' as the key and 'routes' as the value
         route_dict = routes.groupby('label')['routes'].apply(list).to_dict()
 
+        # Convert metadata into dict
+        metadata = json.loads(metadata_df.to_json(orient="index"))
+
         # Separate raw data and analytical data
         final_data = {
-            "counts": json.loads(counts.to_json(orient="records")),
+            "metadata": metadata,
+            "tracking_format": trk_fmt,
+            "counts": counts,
             "routes": route_dict
         }
 
