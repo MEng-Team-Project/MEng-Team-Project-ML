@@ -161,14 +161,14 @@ def init():
         args = list(filter(None, OFFLINE_ANALYSIS(stream, analysis_path, half).split(" ")))
 
         logging.info(args)
-
+        
         # NOTE: Uncomment stdout and stderr for async operation, it's sync by default
         subprocess.run(
             args,
             #stdout=subprocess.PIPE,
             #stderr=subprocess.PIPE,
             cwd=os.getcwd())
-
+        
         return jsonify("Video stream analysis successfully started")
 
     except Exception as e:
