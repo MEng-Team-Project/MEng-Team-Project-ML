@@ -30,6 +30,9 @@ from pathlib import Path
 import pandas as pd
 import sqlite3
 import json
+import numpy as np
+
+from shapely.geometry import Point, Polygon
 
 from flask import Flask, request, jsonify
 
@@ -48,6 +51,135 @@ app = Flask(__name__)
 OFFLINE_ANALYSIS = lambda source, analysis_path, half: \
     f'python yolov8_tracking/track.py --source {source} --save-vid --save-trajectories --yolo-weights yolov8l.pt --tracking-method strongsort --analysis_db_path {analysis_path} {"--half" if half else ""}'
 
+@app.route("/api/routes/", methods=["POST"])
+def routes():
+    """Get per object count for each supplied route region
+    
+    args:
+        stream  - Stream ID to get data for.
+        regions - Route region polygon information
+        start   - (Optional) Start frame
+        end     - (Optional) End frame
+        classes - (Optional) List of COCO class labels to filter detections by
+    """
+    try:
+        # Get stream ID
+        content = request.json
+        stream  = content["stream"]
+        print("api/routes->content:", content)
+
+        # Check route info
+        if not "regions" in content:
+            return jsonify("Error: Route region polygons required"), 400
+
+        # Get SQLite detection data
+        analysis_path = Path(FLAGS.analysis_dir) / f"{stream}.db"
+        con = sqlite3.connect(analysis_path)
+        detections_df = pd.read_sql_query("SELECT * FROM detection;", con)
+        metadata_df   = pd.read_sql_query("SELECT * FROM metadata;", con)
+        metadata_df   = metadata_df.iloc[0]
+        if "id" in metadata_df:
+            del metadata_df["id"]
+        con.close()
+
+        # (Optional) Apply start and end frame filters
+        data = detections_df
+        if "start" in content:
+            data = data[data["frame"] >= content["start"]]
+        if "end" in content:
+            data = data[data["frame"] <= content["end"]]
+        if "classes" in content:
+            classes = content["classes"]
+            data    = data[data["label"].isin(classes)]
+        
+        # NOTE: SAME TILL HERE
+        routes_df = data[["frame", "label", "det_id", "bbox_x", "bbox_y", "bbox_w", "bbox_h"]].copy()
+        routes_df["anchor_x"] = routes_df.apply(
+            lambda row: row["bbox_x"] + (row["bbox_w"] / 2.0), axis=1)
+        routes_df["anchor_y"] = routes_df.apply(
+            lambda row: row["bbox_y"] + (row["bbox_h"] / 2.0), axis=1)
+
+        def get_values(group):
+            return group[['anchor_x', 'anchor_y']].values.tolist()
+
+        entire_routes = routes_df.groupby(['label', 'det_id']).apply(get_values)
+
+
+        import json
+        trk_fmt = "first_last"
+
+        def get_values(group, trk_fmt):
+            vals = group[['frame', 'anchor_x', 'anchor_y']].values.tolist()
+            if trk_fmt == "first_last":
+                vals = [vals[0], vals[-1]]
+            vals = [{"frame:": val[0], "x": val[1], "y": val[2]} for val in vals]
+            return vals
+
+        routes = routes_df.groupby(['label', 'det_id']).apply(
+                    lambda group: get_values(group, trk_fmt))
+
+        # Reset the index of the resulting series to remove the MultiIndex
+        routes = routes.reset_index()
+
+        # Replace the MultiIndex label column names with 'label' and 'det_id'
+        routes.rename(columns={0: 'routes'}, inplace=True)
+        routes.rename(columns={'level_0': 'label', 'level_1': 'det_id'}, inplace=True)
+
+        # Create a dictionary with 'label' as the key and 'routes' as the value
+        route_dict = routes.groupby('label')['routes'].apply(list).to_dict()
+
+        # 1. Get start and end pos for each unique object during entire video
+        start_end_df = entire_routes.copy()
+        start_end_df = start_end_df.reset_index()
+
+        overlap_start_df = start_end_df.copy()[["label", "det_id"]]
+        overlap_end_df = start_end_df.copy()[["label", "det_id"]]
+
+        start_end_df["start_x"] = start_end_df.apply(lambda row: row[0][0][0],  axis=1)
+        start_end_df["start_y"] = start_end_df.apply(lambda row: row[0][0][1],  axis=1)
+        start_end_df["end_x"]   = start_end_df.apply(lambda row: row[0][-1][0], axis=1)
+        start_end_df["end_y"]   = start_end_df.apply(lambda row: row[0][-1][1], axis=1)
+        if 0 in start_end_df:
+            del start_end_df[0]
+
+        # 2. Get overlaps between start and end, and each region
+        ROUTE_REGIONS = content["regions"]
+        for route_region in ROUTE_REGIONS.keys():
+            cur_polygon = Polygon(ROUTE_REGIONS[route_region])
+
+            # Start Geometry
+            start_geometry = [Point(x, y) for x, y in zip(start_end_df["start_x"], start_end_df["start_y"])]
+
+            # Start Overlap
+            start_end_df[f"{route_region}_start_overlap"] = [point.within(cur_polygon) for point in start_geometry]
+            overlap_start_df[route_region]                = start_end_df[f"{route_region}_start_overlap"]
+
+            # End Geometry
+            end_geometry = [Point(x, y) for x, y in zip(start_end_df["end_x"], start_end_df["end_y"])]
+
+            # End Overlap
+            start_end_df[f"{route_region}_end_overlap"] = [point.within(cur_polygon) for point in end_geometry]
+            overlap_end_df[route_region]                = start_end_df[f"{route_region}_end_overlap"]
+
+        def label_overlap(row):
+            for i in range(len(row)):
+                if row[i]:
+                    return overlap_start_df.columns[2:][i]
+            return np.nan
+
+        overlap_start_df['overlap_label'] = overlap_start_df.iloc[:, 2:].apply(label_overlap, axis=1)
+        overlap_end_df['overlap_label'] = overlap_end_df.iloc[:, 2:].apply(label_overlap, axis=1)
+
+        overlap_df = start_end_df.iloc[:, :2]
+        overlap_df["start"] = overlap_start_df["overlap_label"]
+        overlap_df["end"]   = overlap_end_df["overlap_label"]
+
+        overlap = json.loads(overlap_df.to_json(orient="records"))
+        return jsonify(overlap)
+
+    except Exception as e:
+        return jsonify("Error:", str(e)), 400
+
 @app.route("/api/analysis/", methods=["POST"])
 def analysis():
     """Get count and route analytical information of a video stream.
@@ -62,7 +194,6 @@ def analysis():
                   include the first and last anchor points for an object in the
                   route, or it will include the entire route for the requested
                   portion of the video. By default, returns `first_last`.
-
     """
     try:
         # Get stream ID
