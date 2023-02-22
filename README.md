@@ -64,7 +64,7 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
    - [ ] HGV
       - YOLOv8 not currently fine-tuned for HGVs yet.
 
-## File Formats
+## Source File Formats
 
 - Accepts .mp4 source files. This is enforced during video stream
   upload by only accepting .mp4 files and live streams should be converted
@@ -124,4 +124,61 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
    start   - (Optional) Start frame 
    end     - (Optional) End frame 
    classes - (Optional) List of COCO class labels to filter detections by
+```
+
+## TensorRT
+
+### Overview
+
+It is essential to export and test TensorRT using Linux.
+It is possible to run TensorRT on Windows using the `.zip` package found
+on the website, by the `tensorrt` module for Python is not really supported.
+
+### 1. Export Engine
+
+To export a model, use this command to export the PyTorch .pt model
+to ONNX format .onnx:
+
+```bash
+python3 YOLOv8-TensorRT/export-det.py \
+--weights yolov8s.pt \
+--iou-thres 0.65 \
+--conf-thres 0.25 \
+--topk 100 \
+--opset 11 \
+--sim \
+--input-shape 1 3 640 640 \
+--device cuda:0
+```
+
+Then you need to build a TensorRT engine with static settings which
+will perform inference later. The execution device also needs to be
+fixed here (GPU or CPU).
+
+```bash
+python3 YOLOv8-TensorRT/build.py \
+--weights yolov8s.onnx \
+--iou-thres 0.65 \
+--conf-thres 0.25 \
+--topk 100 \
+--fp16  \
+--device cuda:0
+```
+
+### 2. Inference
+
+To test run inference of the detection model and get timing profiling data,
+run the following command:
+
+```bash
+python3 YOLOv8-TensorRT/infer-det.py --engine yolov8s.engine --imgs data
+```
+
+### Profiling (Benchmark Performance)
+
+To profile every single component of the TensorRT engine with an existing
+model, run the following command:
+
+```bash
+python3 YOLOv8-TensorRT/trt-profile.py --engine yolov8s.engine --device cuda:0
 ```
