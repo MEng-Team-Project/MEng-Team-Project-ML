@@ -152,3 +152,6 @@ vids/
 
 # Miscellaneous Local Experimental Files
 yolo_db_test.py
+
+# Ignore neptune logs
+.neptune/
