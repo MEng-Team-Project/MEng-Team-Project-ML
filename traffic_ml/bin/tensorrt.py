@@ -19,31 +19,39 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Uses TensorRT for inference during production."""
+"""Uses a prebuilt TensorRT engine to perform inference with an ONNX format
+YOLOv8 model."""
 
-"""
-Required steps:
-1. Convert pre-trained model into .onnx format
-2. TensorRT (TRT) imported as py module (tensorrt as trt)
-   - Batch size fixed on engine (TRT) creation
-   This is then saved as an engine (if you are using it like this)
-3. 
-"""
+# Need to add YOLOv8-TensorRT submodule to PATH
+import sys
+sys.path.append('../../YOLOv8-TensorRT')
+
+from models import TRTModule
+from config import CLASSES, COLORS
+from models.torch_utils import det_postprocess
+from models.utils import blob, letterbox, path_to_list
+
+import cv2
+import torch
 
 from absl import app
 from absl import flags
 
-from ultralytics import YOLO
-
 FLAGS = flags.FLAGS
-flags.DEFINE_string("model", "yolov8n.pt", "Model to convert to ONNX")
+flags.DEFINE_string("engine", None,   "TensorRT engine for inference (.engine)")
+flags.DEFINE_string("device", "cuda", "Device to run TensorRT on")
+
+flags.mark_flag_as_required("model")
+flags.mark_flag_as_required("engine")
 
 def main(unused_argv):
-    model = YOLO(FLAGS.model)
-    # msg   = model.export(format="onnx", opset=11)
-    msg   = model.export(format="engine", device="0") # opset=11)
-    # msg   = model.export(format="engine", opset=11)
-    print(msg)
+    engine = FLAGS.engine
+    device = torch.device(FLAGS.device)
+    Engine = TRTModule(engine, device)
+    H, W = Engine.inp_info[0].shape[-2:]
+
+    # Arrange desired output names order
+    Engine.set_desired(['num_dets', 'bboxes', 'scores', 'labels'])
 
 if __name__ == "__main__":
     app.run(main)
