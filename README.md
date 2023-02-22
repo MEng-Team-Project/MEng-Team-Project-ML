@@ -95,24 +95,33 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
 
 ## HTTP API
 
-- POST: `http://localhost:6000/api/init` \
-   Body Parameters: \
+
+- POST: `http://localhost:6000/api/init` 
+```
+   Body Parameters: 
    stream - Absolute video stream path
+```
+
 - POST: `http://localhost:6000/api/analysis`
-   Body Parameters: \
-   stream  - Stream ID to get data for. \
-   raw     - (Optional) Provide the raw detection information in the result \
-   start   - (Optional) Start frame \
-   end     - (Optional) End frame \
-   classes - (Optional) List of COCO class labels to filter detections by \
-   trk_fmt - (Optional) Either `first_last` or `entire`. This will either \
-             include the first and last anchor points for an object in the \
-             route, or it will include the entire route for the requested \
-             portion of the video. By default, returns `first_last`.
-- POST: `http://localhost:6000/api/routes` \
-   Body Parameters: \
-   stream  - Stream ID to get data for. \
-   regions - Route region polygon information \
-   start   - (Optional) Start frame \
-   end     - (Optional) End frame \
+```
+   Body Parameters: 
+   stream  - Stream ID to get data for. 
+   raw     - (Optional) Provide the raw detection information in the result 
+   start   - (Optional) Start frame 
+   end     - (Optional) End frame 
+   classes - (Optional) List of COCO class labels to filter detections by 
+   trk_fmt - (Optional) Either `first_last` or `entire`. This will either 
+             include the first and last anchor points for an object in the 
+             route, or it will include the entire route for the requested 
+             portion of the video. By default, returns `first_last`
+```
+
+- POST: `http://localhost:6000/api/routes` 
+```
+   Body Parameters: 
+   stream  - Stream ID to get data for. 
+   regions - Route region polygon information 
+   start   - (Optional) Start frame 
+   end     - (Optional) End frame 
    classes - (Optional) List of COCO class labels to filter detections by
+```
