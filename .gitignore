@@ -142,7 +142,13 @@ metadata.json
 # Ignore testing .db files
 *.db
 
-# NOTE: REMOVE AFTER PARA COURSEWORK
+# Ignore TensorRT models and engines
+*.onnx
+*.engine
+
+# Ignore img/vid source folders
+imgs/
 vids/
-Parallel Programming - Mini Task Notes.txt
-benchmarks.py
+
+# Miscellaneous Local Experimental Files
+yolo_db_test.py
