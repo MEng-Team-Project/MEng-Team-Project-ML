@@ -28,7 +28,7 @@ doing the following:
 git clone https://github.com/MEng-Team-Project/MEng-Team-Project-ML
 python -m pip install -e MEng-Team-Project-ML/
 
-# Get yolov8_tracking submodule
+# Get yolov8_tracking and yolov8 tensorrt submodule(s)
 git submodule init
 git submodule update
 
