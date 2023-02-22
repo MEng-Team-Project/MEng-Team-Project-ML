@@ -1,6 +1,6 @@
 # MIT License
 # 
-# Copyright (c) 2022 MEng-Team-Project
+# Copyright (c) 2023 MEng-Team-Project
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -19,36 +19,31 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Google Drive utilities testing."""
+"""Uses TensorRT for inference during production."""
 
-import ffmpeg
-import os
+"""
+Required steps:
+1. Convert pre-trained model into .onnx format
+2. TensorRT (TRT) imported as py module (tensorrt as trt)
+   - Batch size fixed on engine (TRT) creation
+   This is then saved as an engine (if you are using it like this)
+3. 
+"""
 
-from absl.testing import absltest
+from absl import app
+from absl import flags
 
-from traffic_ml.tests import utils
-from traffic_ml.lib.gdrive import get_gdrive_id, download_file_from_google_drive
+from ultralytics import YOLO
 
-TEST_FILE_LINK        = "https://drive.google.com/file/d/1g_YASd9Rs_eAw4H_inGcFnDwQDmsj-fo/view?usp=share_link"
-TEST_FILE_DESTINATION = "./00001.01350_2022-12-07T15-35-24.000Z.mp4"
-TARGET_DURATION_TS    = 133632
+FLAGS = flags.FLAGS
+flags.DEFINE_string("model", "yolov8n.pt", "Model to convert to ONNX")
 
-
-class TestGDriveDownload(utils.TestCase):
-    def test_gdrive_download(self):
-        gdrive_id = get_gdrive_id(TEST_FILE_LINK)
-        if gdrive_id:
-            download_file_from_google_drive(gdrive_id, TEST_FILE_DESTINATION)
-            metadata = ffmpeg.probe(TEST_FILE_DESTINATION)["streams"][0]
-            self.assertEqual(metadata["duration_ts"], TARGET_DURATION_TS)
-        else:
-            print("Invalid shareable URL link:", TEST_FILE_LINK)
-
-    def tearDown(self):
-        super(TestGDriveDownload, self).tearDown()
-
-        os.remove(TEST_FILE_DESTINATION)
-
+def main(unused_argv):
+    model = YOLO(FLAGS.model)
+    # msg   = model.export(format="onnx", opset=11)
+    msg   = model.export(format="engine", device="0") # opset=11)
+    # msg   = model.export(format="engine", opset=11)
+    print(msg)
 
 if __name__ == "__main__":
-    absltest.main()
+    app.run(main)

@@ -441,14 +441,15 @@ def main(unused_argv):
 
                         for track in tracks:
                             centroids = track
-                            track_out = [[
-                                centroids.centroids[i][0],
-                                centroids.centroids[i][1],
-                                centroids.centroids[i+1][0],
-                                centroids.centroids[i+1][1]
-                            ]
-                            for i, _ in  enumerate(centroids.centroids)
-                            if i < len(centroids.centroids)-1]
+                            track_out = [
+                                [
+                                    centroids.centroids[i][0],
+                                    centroids.centroids[i][1],
+                                    centroids.centroids[i+1][0],
+                                    centroids.centroids[i+1][1]
+                                ]
+                                for i, _ in  enumerate(centroids.centroids)
+                                if i < len(centroids.centroids)-1]
                             if log and frame_idx < 3: # 2nd frame
                                 print("track->centroids:", track_out)
 
@@ -457,7 +458,7 @@ def main(unused_argv):
                                 print("det", frame_idx, det)
                     track_total.append(track_tm.dt * 1E3)
 
-    run["mean_track_ms"] = sum(track_total) / len(track_total)
+    run["mean_track_ms"]  = sum(track_total) / len(track_total)
     run["total_track_ms"] = sum(track_total)
 
     run.stop()
