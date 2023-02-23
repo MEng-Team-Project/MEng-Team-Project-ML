@@ -126,7 +126,7 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
    classes - (Optional) List of COCO class labels to filter detections by
 ```
 
-## TensorRT
+## TensorRT (YOLOv8 and StrongSORT)
 
 ### Overview
 
@@ -134,7 +134,9 @@ It is essential to export and test TensorRT using Linux.
 It is possible to run TensorRT on Windows using the `.zip` package found
 on the website, by the `tensorrt` module for Python is not really supported.
 
-### 1. Export Engine
+### YOLOv8
+
+#### 1. Export Engine
 
 To export a model, use this command to export the PyTorch .pt model
 to ONNX format .onnx:
@@ -165,7 +167,7 @@ python3 YOLOv8-TensorRT/build.py \
 --device cuda:0
 ```
 
-### 2. Inference
+#### 2. Inference
 
 To test run inference of the detection model and get timing profiling data,
 run the following command:
@@ -174,11 +176,30 @@ run the following command:
 python3 YOLOv8-TensorRT/infer-det.py --engine yolov8s.engine --imgs data
 ```
 
-### Profiling (Benchmark Performance)
+#### Profiling (Benchmark Performance)
 
 To profile every single component of the TensorRT engine with an existing
 model, run the following command:
 
 ```bash
 python3 YOLOv8-TensorRT/trt-profile.py --engine yolov8s.engine --device cuda:0
+```
+
+### StrongSORT
+
+This export requires version `8.0.20` of the `ultralytics` module.
+
+```bash
+pip install ultralytics==8.0.20
+```
+
+And then run the following command:
+
+```bash
+python3 yolov8_tracking/trackers/reid_export.py \
+--device 0 \
+--verbose \
+--include engine \
+--batch-size 32 \
+--dynamic
 ```
