@@ -146,3 +146,13 @@ metadata.json
 vids/
 Parallel Programming - Mini Task Notes.txt
 benchmarks.py
+
+# TensorRT exports
+*.onnx
+*.engine
+
+# YOLOv8 COCO Dataset
+datasets/
+
+# Neptune Logging
+.neptune/
