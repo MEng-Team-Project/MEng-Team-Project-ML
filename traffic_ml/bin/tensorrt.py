@@ -1,6 +1,6 @@
 # MIT License
 # 
-# Copyright (c) 2022 MEng-Team-Project
+# Copyright (c) 2023 MEng-Team-Project
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -19,36 +19,39 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Google Drive utilities testing."""
+"""Uses a prebuilt TensorRT engine to perform inference with an ONNX format
+YOLOv8 model."""
 
-import ffmpeg
-import os
+# Need to add YOLOv8-TensorRT submodule to PATH
+import sys
+sys.path.append('../../YOLOv8-TensorRT')
 
-from absl.testing import absltest
+from models import TRTModule
+from config import CLASSES, COLORS
+from models.torch_utils import det_postprocess
+from models.utils import blob, letterbox, path_to_list
 
-from traffic_ml.tests import utils
-from traffic_ml.lib.gdrive import get_gdrive_id, download_file_from_google_drive
+import cv2
+import torch
 
-TEST_FILE_LINK        = "https://drive.google.com/file/d/1g_YASd9Rs_eAw4H_inGcFnDwQDmsj-fo/view?usp=share_link"
-TEST_FILE_DESTINATION = "./00001.01350_2022-12-07T15-35-24.000Z.mp4"
-TARGET_DURATION_TS    = 133632
+from absl import app
+from absl import flags
 
+FLAGS = flags.FLAGS
+flags.DEFINE_string("engine", None,   "TensorRT engine for inference (.engine)")
+flags.DEFINE_string("device", "cuda", "Device to run TensorRT on")
 
-class TestGDriveDownload(utils.TestCase):
-    def test_gdrive_download(self):
-        gdrive_id = get_gdrive_id(TEST_FILE_LINK)
-        if gdrive_id:
-            download_file_from_google_drive(gdrive_id, TEST_FILE_DESTINATION)
-            metadata = ffmpeg.probe(TEST_FILE_DESTINATION)["streams"][0]
-            self.assertEqual(metadata["duration_ts"], TARGET_DURATION_TS)
-        else:
-            print("Invalid shareable URL link:", TEST_FILE_LINK)
+flags.mark_flag_as_required("model")
+flags.mark_flag_as_required("engine")
 
-    def tearDown(self):
-        super(TestGDriveDownload, self).tearDown()
+def main(unused_argv):
+    engine = FLAGS.engine
+    device = torch.device(FLAGS.device)
+    Engine = TRTModule(engine, device)
+    H, W = Engine.inp_info[0].shape[-2:]
 
-        os.remove(TEST_FILE_DESTINATION)
-
+    # Arrange desired output names order
+    Engine.set_desired(['num_dets', 'bboxes', 'scores', 'labels'])
 
 if __name__ == "__main__":
-    absltest.main()
+    app.run(main)

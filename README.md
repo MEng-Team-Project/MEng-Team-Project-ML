@@ -28,7 +28,7 @@ doing the following:
 git clone https://github.com/MEng-Team-Project/MEng-Team-Project-ML
 python -m pip install -e MEng-Team-Project-ML/
 
-# Get yolov8_tracking submodule
+# Get yolov8_tracking and yolov8 tensorrt submodule(s)
 git submodule init
 git submodule update
 
@@ -64,7 +64,7 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
    - [ ] HGV
       - YOLOv8 not currently fine-tuned for HGVs yet.
 
-## File Formats
+## Source File Formats
 
 - Accepts .mp4 source files. This is enforced during video stream
   upload by only accepting .mp4 files and live streams should be converted
@@ -95,24 +95,111 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
 
 ## HTTP API
 
-- POST: `http://localhost:6000/api/init` \
-   Body Parameters: \
+
+- POST: `http://localhost:6000/api/init` 
+```
+   Body Parameters: 
    stream - Absolute video stream path
+```
+
 - POST: `http://localhost:6000/api/analysis`
-   Body Parameters: \
-   stream  - Stream ID to get data for. \
-   raw     - (Optional) Provide the raw detection information in the result \
-   start   - (Optional) Start frame \
-   end     - (Optional) End frame \
-   classes - (Optional) List of COCO class labels to filter detections by \
-   trk_fmt - (Optional) Either `first_last` or `entire`. This will either \
-             include the first and last anchor points for an object in the \
-             route, or it will include the entire route for the requested \
-             portion of the video. By default, returns `first_last`.
-- POST: `http://localhost:6000/api/routes` \
-   Body Parameters: \
-   stream  - Stream ID to get data for. \
-   regions - Route region polygon information \
-   start   - (Optional) Start frame \
-   end     - (Optional) End frame \
+```
+   Body Parameters: 
+   stream  - Stream ID to get data for. 
+   raw     - (Optional) Provide the raw detection information in the result 
+   start   - (Optional) Start frame 
+   end     - (Optional) End frame 
+   classes - (Optional) List of COCO class labels to filter detections by 
+   trk_fmt - (Optional) Either `first_last` or `entire`. This will either 
+             include the first and last anchor points for an object in the 
+             route, or it will include the entire route for the requested 
+             portion of the video. By default, returns `first_last`
+```
+
+- POST: `http://localhost:6000/api/routes` 
+```
+   Body Parameters: 
+   stream  - Stream ID to get data for. 
+   regions - Route region polygon information 
+   start   - (Optional) Start frame 
+   end     - (Optional) End frame 
    classes - (Optional) List of COCO class labels to filter detections by
+```
+
+## TensorRT (YOLOv8 and StrongSORT)
+
+### Overview
+
+It is essential to export and test TensorRT using Linux.
+It is possible to run TensorRT on Windows using the `.zip` package found
+on the website, by the `tensorrt` module for Python is not really supported.
+
+### YOLOv8
+
+#### 1. Export Engine
+
+To export a model, use this command to export the PyTorch .pt model
+to ONNX format .onnx:
+
+```bash
+python3 YOLOv8-TensorRT/export-det.py \
+--weights yolov8s.pt \
+--iou-thres 0.65 \
+--conf-thres 0.25 \
+--topk 100 \
+--opset 11 \
+--sim \
+--input-shape 1 3 640 640 \
+--device cuda:0
+```
+
+Then you need to build a TensorRT engine with static settings which
+will perform inference later. The execution device also needs to be
+fixed here (GPU or CPU).
+
+```bash
+python3 YOLOv8-TensorRT/build.py \
+--weights yolov8s.onnx \
+--iou-thres 0.65 \
+--conf-thres 0.25 \
+--topk 100 \
+--fp16  \
+--device cuda:0
+```
+
+#### 2. Inference
+
+To test run inference of the detection model and get timing profiling data,
+run the following command:
+
+```bash
+python3 YOLOv8-TensorRT/infer-det.py --engine yolov8s.engine --imgs data
+```
+
+#### Profiling (Benchmark Performance)
+
+To profile every single component of the TensorRT engine with an existing
+model, run the following command:
+
+```bash
+python3 YOLOv8-TensorRT/trt-profile.py --engine yolov8s.engine --device cuda:0
+```
+
+### StrongSORT
+
+This export requires version `8.0.20` of the `ultralytics` module.
+
+```bash
+pip install ultralytics==8.0.20
+```
+
+And then run the following command:
+
+```bash
+python3 yolov8_tracking/trackers/reid_export.py \
+--device 0 \
+--verbose \
+--include engine \
+--batch-size 32 \
+--dynamic
+```

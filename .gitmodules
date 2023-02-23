@@ -1,3 +1,6 @@
 [submodule "yolov8_tracking"]
 	path = yolov8_tracking
 	url = https://github.com/MiscellaneousStuff/yolov8_tracking/
+[submodule "YOLOv8-TensorRT"]
+	path = YOLOv8-TensorRT
+	url = https://github.com/MiscellaneousStuff/YOLOv8-TensorRT

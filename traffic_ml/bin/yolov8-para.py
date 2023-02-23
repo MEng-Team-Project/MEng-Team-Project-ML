@@ -58,8 +58,8 @@ from dotenv import dotenv_values
 import neptune.new as neptune
 
 from pathlib import Path
-# from traffic_ml.lib.sort_count import Sort
-from sort_count import Sort
+from traffic_ml.lib.sort_count import Sort
+# from sort_count import Sort
 
 import torch
 torch.backends.cudnn.benchmark = False
@@ -73,6 +73,7 @@ flags.DEFINE_string("exp", "", "(Optional) Experiment name")
 flags.DEFINE_integer("batch_size", 1, "Batch size during inference")
 flags.DEFINE_integer("imgsz", 640, "NxN image size reshaping for Yolov8 object detection")
 flags.DEFINE_bool("trk", False, "Whether or not to enable object tracking")
+flags.DEFINE_bool("engine", None, "(Optional) TensorRT Engine")
 flags.mark_flag_as_required("video_dir")
 
 class ParaLoadImages:
@@ -388,7 +389,9 @@ def main(unused_argv):
     model = FLAGS.model
     imgsz = FLAGS.imgsz
     exp = FLAGS.exp
+    engine = FLAGS.engine
     run["model"] = model
+    run["trt_engine"] = engine
     run["batch_size"] = batch_size
     run["trk"] = trk
     run["imgsz"] = imgsz
@@ -441,14 +444,15 @@ def main(unused_argv):
 
                         for track in tracks:
                             centroids = track
-                            track_out = [[
-                                centroids.centroids[i][0],
-                                centroids.centroids[i][1],
-                                centroids.centroids[i+1][0],
-                                centroids.centroids[i+1][1]
-                            ]
-                            for i, _ in  enumerate(centroids.centroids)
-                            if i < len(centroids.centroids)-1]
+                            track_out = [
+                                [
+                                    centroids.centroids[i][0],
+                                    centroids.centroids[i][1],
+                                    centroids.centroids[i+1][0],
+                                    centroids.centroids[i+1][1]
+                                ]
+                                for i, _ in  enumerate(centroids.centroids)
+                                if i < len(centroids.centroids)-1]
                             if log and frame_idx < 3: # 2nd frame
                                 print("track->centroids:", track_out)
 
@@ -457,13 +461,13 @@ def main(unused_argv):
                                 print("det", frame_idx, det)
                     track_total.append(track_tm.dt * 1E3)
 
-    run["mean_track_ms"] = sum(track_total) / len(track_total)
-    run["total_track_ms"] = sum(track_total)
+    len_track_total = len(track_total)
+    if len_track_total:
+        run["mean_track_ms"]  = sum(track_total) / len_track_total
+        run["total_track_ms"] = sum(track_total)
+        print("mean track ms", "total track ms", sum(track_total) / len_track_total, sum(track_total))
 
     run.stop()
-    
-def entry_point():
-    app.run(main)
 
 if __name__ == "__main__":
     app.run(main)

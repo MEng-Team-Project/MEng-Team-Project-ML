@@ -41,6 +41,7 @@ from traffic_ml.lib.sort_count import Sort
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("video_dir", None, "Directory of video files to bulk analyse")
+flags.DEFINE_string("model", "yolov8n.pt", "Choose YOLOv8 model")
 
 class TestCallback(Callback):
     def on_predict_start(self):
@@ -77,7 +78,7 @@ def main(unused_argv):
         source  = os.path.join(video_dir, video)
         results = predictor.__call__(
             source,
-            model="yolov8n.pt",
+            model=FLAGS.model,
             return_outputs=True,
             log=False) # batch
 
