@@ -143,13 +143,13 @@ to ONNX format .onnx:
 
 ```bash
 python3 YOLOv8-TensorRT/export-det.py \
---weights yolov8s.pt \
+--weights yolov8l.pt \
 --iou-thres 0.65 \
 --conf-thres 0.25 \
 --topk 100 \
 --opset 11 \
 --sim \
---input-shape 1 3 640 640 \
+--input-shape 32 3 640 640 \
 --device cuda:0
 ```
 
@@ -159,11 +159,12 @@ fixed here (GPU or CPU).
 
 ```bash
 python3 YOLOv8-TensorRT/build.py \
---weights yolov8s.onnx \
+--weights yolov8l.onnx \
 --iou-thres 0.65 \
 --conf-thres 0.25 \
 --topk 100 \
 --fp16  \
+--input-shape 32 3 640 640 \
 --device cuda:0
 ```
 
@@ -173,7 +174,10 @@ To test run inference of the detection model and get timing profiling data,
 run the following command:
 
 ```bash
-python3 YOLOv8-TensorRT/infer-det.py --engine yolov8s.engine --imgs data
+python3 YOLOv8-TensorRT/infer-det-para.py \
+--engine yolov8l.engine \
+--source vid \
+--batch-size 32
 ```
 
 #### Profiling (Benchmark Performance)
