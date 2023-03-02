@@ -48,18 +48,8 @@ flags.mark_flag_as_required("analysis_dir")
 
 app = Flask(__name__)
 
-"""
-OFFLINE_ANALYSIS = lambda source, analysis_path, half: \
-    f'python yolov8_tracking/track.py --source {source} --save-vid --save-trajectories --yolo-weights yolov8n.pt --tracking-method strongsort --analysis_db_path {analysis_path} {"--half" if half else ""}'
-"""
-
 OFFLINE_ANALYSIS = lambda source, analysis_path, half: \
     f'python yolov8_tracking/track.py --source {source} --save-vid --save-trajectories --yolo-weights yolov8l.pt --tracking-method strongsort --analysis_db_path {analysis_path} {"--half" if half else ""}'
-
-"""
-OFFLINE_ANALYSIS = lambda source, analysis_path, half: \
-    f'python yolov8_tracking/track.py --source {source} --save-vid --save-trajectories --yolo-weights yolov8l.onnx --tracking-method strongsort --analysis_db_path {analysis_path} {"--half" if half else ""}'
-"""
 
 @app.route("/api/routes/", methods=["POST"])
 def routes():
