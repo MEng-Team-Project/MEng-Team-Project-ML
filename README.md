@@ -57,38 +57,69 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
 
 ## Notebooks
 
-- `1. JSON Attempt.ipynb.ipynb` Analysis of the initial JSON files produced
-  in the original draft version of our proposed model. Notebook contains
-  code used to determine road routes, code used to calculate counts of
-  object types along routes, etc.
-- `2. SQLite3 Attempt.ipynb` Changed recording of analytics from YOLOv7
-  and ClassySORT to use SQLite3 as the recorded format. This saved
-  information was extremely raw and ill conceived as it required
-  complex and difficult post-processing to get any kind of useful
-  information from.
-- `3. SQLite3 StrongSORT.ipynb` Switched from YOLOv7 to YOLOv8 and
-  switched object tracking algorithm from SORT to StrongSORT which
-  gigantically improves performance. StrongSORT has a lower IDs
-  (identity switching) rate compared to SORT of 4470 compared to
-  1066, respectively on MOT20 [ref](https://github.com/dyhBUPT/StrongSORT).
-  This means that the SORT algorithm is identifying 4.19x more objects
-  than StrongSORT so it's association between detections and tracking
-  the same object across time is highly unstable.
-- `4. Model Validation.ipynb` Contains a demonstration of how to validate
-  the predictions (pred) of our ML pipeline against ground truth (GT) annotations.
-  GT and pred data converted to MOT16 format and formally evaluated and compared
-  using `motmetrics` lib.
+This section contains a detailed explanation for the contents and purpose
+of each notebook.
+
+<details><summary>1. JSON Attempt.ipynb</summary>
+
+Analysis of the initial JSON files produced
+in the original draft version of our proposed model. Notebook contains
+code used to determine road routes, code used to calculate counts of
+object types along routes, etc.
+
+</details>
+
+<details><summary>2. SQLite3 Attempt.ipynb</summary>
+
+Changed recording of analytics from YOLOv7
+and ClassySORT to use SQLite3 as the recorded format. This saved
+information was extremely raw and ill conceived as it required
+complex and difficult post-processing to get any kind of useful
+information from.
+
+</details>
+
+<details><summary>3. SQLite3 StrongSORT.ipynb</summary>
+
+Switched from YOLOv7 to YOLOv8 and
+switched object tracking algorithm from SORT to StrongSORT which
+gigantically improves performance. StrongSORT has a lower IDs
+(identity switching) rate compared to SORT of 4470 compared to
+1066, respectively on MOT20 [ref](https://github.com/dyhBUPT/StrongSORT).
+This means that the SORT algorithm is identifying 4.19x more objects
+than StrongSORT so it's association between detections and tracking
+the same object across time is highly unstable.
+
+</details>
+
+<details><summary>4. Model Validation.ipynb</summary>
+
+Contains a demonstration of how to validate
+the predictions (pred) of our ML pipeline against ground truth (GT) annotations.
+GT and pred data converted to MOT16 format and formally evaluated and compared
+using `motmetrics` lib.
+
+</details>
 
 ## HTTP API
 
+This section contains each of the HTTP endpoints for the microservice,
+with an explanation for each endpoint, along with it's expected and
+optional parameters.
 
-- POST: `http://localhost:6000/api/init` 
+<details><summary>Initialise stream analysis</summary>
+
+POST: `http://localhost:6000/api/init` 
 ```
    Body Parameters: 
    stream - Absolute video stream path
 ```
 
-- POST: `http://localhost:6000/api/analysis`
+</details>
+
+<details><summary>Retrieve existing high-level analytics</summary>
+
+POST: `http://localhost:6000/api/analysis`
 ```
    Body Parameters: 
    stream  - Stream ID to get data for. 
@@ -102,7 +133,11 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
              portion of the video. By default, returns `first_last`
 ```
 
-- POST: `http://localhost:6000/api/routes` 
+</details>
+
+<details><summary>Retrieve existing low-level granular, route related analytics</summary>
+
+POST: `http://localhost:6000/api/routes` 
 ```
    Body Parameters: 
    stream  - Stream ID to get data for. 
@@ -111,6 +146,8 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
    end     - (Optional) End frame 
    classes - (Optional) List of COCO class labels to filter detections by
 ```
+
+</details>
 
 ## TensorRT (YOLOv8 and StrongSORT)
 
@@ -122,7 +159,7 @@ on the website, by the `tensorrt` module for Python is not really supported.
 
 ### YOLOv8
 
-#### 1. Export Engine
+<details><summary>1. Export Engine</summary>
 
 To export a model, use this command to export the PyTorch .pt model
 to ONNX format .onnx:
@@ -154,7 +191,9 @@ python3 YOLOv8-TensorRT/build.py \
 --device cuda:0
 ```
 
-#### 2. Inference
+</details>
+
+<details><summary>2. Inference</summary>
 
 To test run inference of the detection model and get timing profiling data,
 run the following command:
@@ -166,7 +205,9 @@ python3 YOLOv8-TensorRT/infer-det-para.py \
 --batch-size 32
 ```
 
-#### Profiling (Benchmark Performance)
+</details>
+
+<details><summary>Profiling (Benchmark Performance)</summary>
 
 To profile every single component of the TensorRT engine with an existing
 model, run the following command:
@@ -174,6 +215,8 @@ model, run the following command:
 ```bash
 python3 YOLOv8-TensorRT/trt-profile.py --engine yolov8s.engine --device cuda:0
 ```
+
+</details>
 
 ### StrongSORT
 
