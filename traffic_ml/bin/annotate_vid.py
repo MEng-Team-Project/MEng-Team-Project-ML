@@ -27,6 +27,8 @@ from absl import app
 from absl import flags
 
 import cv2
+import sqlite3
+import pandas as pd
 
 from traffic_ml.lib.data      import COCO_CLASSES
 from traffic_ml.lib.convertor import Annotations
@@ -41,6 +43,30 @@ flags.DEFINE_string("save_dir",   "./out/", "Save directory for annotated vid")
 flags.mark_flag_as_required("source")
 flags.mark_flag_as_required("gt_annot")
 
+GREEN = [0, 255, 0]
+RED   = [255, 0, 0]
+
+def write_frame(r, im0, color):
+    x, y, w, h, l, score, d_id = \
+        int(r["bbox_x"]), \
+        int(r["bbox_y"]), \
+        int(r["bbox_w"]), \
+        int(r["bbox_h"]), \
+        r["label"], \
+        r["conf"], \
+        int(r["det_id"])
+    cv2.rectangle(
+        img=im0,
+        pt1=(x, y),
+        pt2=(x + w, y + h),
+        color=color,
+        thickness=2)
+    cv2.putText(im0,
+        f'{l}:{d_id:.3f}', (x, y - 2),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.75, [225, 255, 255],
+        thickness=2)
+
 def main(unused_argv):
     fps = 30
 
@@ -52,11 +78,8 @@ def main(unused_argv):
                         vid_stride=1)
 
     gt_annots = Annotations.from_darwin(FLAGS.gt_annot)
-
+    
     save_path = str(Path(FLAGS.save_dir) / str(Path(FLAGS.source).stem + ".mp4"))
-
-    print(save_path)
-
 
     writer = cv2.VideoWriter(
         save_path,
@@ -64,34 +87,25 @@ def main(unused_argv):
         fps,
         (1920, 1080))
     
+    if FLAGS.pred_annot:
+        con = sqlite3.connect(FLAGS.pred_annot)
+        detections_df = pd.read_sql_query("SELECT * FROM detection;", con)
+        con.close()
+
     for f, img in enumerate(images):
         source, _, im0, _, _ = img
 
         annots = gt_annots[gt_annots["frame"] == f]
 
+        # Write GT Annots
         for i, r in annots.iterrows():
-            x, y, w, h, l, score, d_id = \
-                int(r["bbox_x"]), \
-                int(r["bbox_y"]), \
-                int(r["bbox_w"]), \
-                int(r["bbox_h"]), \
-                r["label"], \
-                r["conf"], \
-                int(r["det_id"])
-            cls   = l
-            #color = COLORS[cls]
-            color = [255, 0, 0]
-            cv2.rectangle(
-                img=im0,
-                pt1=(x, y),
-                pt2=(x + w, y + h),
-                color=color,
-                thickness=2)
-            cv2.putText(im0,
-                f'{l}:{score:.3f}', (x, y - 2),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.75, [225, 255, 255],
-                thickness=2)
+            write_frame(r, im0, GREEN)
+        
+        # (Optionally) Write Pred Annots
+        if FLAGS.pred_annot:
+            annots      = detections_df[detections_df["frame"] == f]
+            for i, r in annots.iterrows():
+                write_frame(r, im0, RED)
             
         writer.write(im0)
 
