@@ -46,24 +46,6 @@ To run the microservice, run the following code:
 python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-Web/server/analysis"
 ```
 
-## TODO
-
-- [x] TFL JamCam Video Scraper Datasets
-  - [x] Create dataset for multiple conditions
-     - [x] Day time conditions
-           [Raw Videos](https://drive.google.com/drive/u/2/folders/1igKtgK_b13TBwwnDnX5_8y_3ij6R31i_),
-           [Analysis Videos](https://drive.google.com/drive/u/2/folders/1TYaEDctAyxikJD2Oj717cl2KbSIDA2HB)
-     - [x] Night time (incl. snow) conditions \
-           [Raw Videos](https://drive.google.com/drive/u/2/folders/1lSoRB_HmgSLUxehpu7O44jQFB9U6hdWC),
-           [Analysis Videos](https://drive.google.com/drive/u/2/folders/1JOJKVzakrFLt5tC5PpMq6zl6SGPwMopl)
-- [ ] Custom Object Analysis Tested
-   - [x] Bus (Detect Objects in Bus Lane)
-      - Camera ID: 03752, contains a bus stop. This is used as the test set.
-      - [Requirement](https://docs.google.com/document/d/1Q0TwboSrRgvXywVp9VgA9of2G4NjYQBYJ2YSKbkoS-o/edit#bookmark=id.hnc674tzl7ba)
-   - [x] People (This is tested throughout the day time and night time datasets)
-   - [ ] HGV
-      - YOLOv8 not currently fine-tuned for HGVs yet.
-
 ## Source File Formats
 
 - Accepts .mp4 source files. This is enforced during video stream
@@ -92,6 +74,10 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
   This means that the SORT algorithm is identifying 4.19x more objects
   than StrongSORT so it's association between detections and tracking
   the same object across time is highly unstable.
+- `4. Model Validation.ipynb` Contains a demonstration of how to validate
+  the predictions (pred) of our ML pipeline against ground truth (GT) annotations.
+  GT and pred data converted to MOT16 format and formally evaluated and compared
+  using `motmetrics` lib.
 
 ## HTTP API
 
