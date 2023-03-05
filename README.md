@@ -57,7 +57,18 @@ python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-
 
 ## Annotate a Video
 
+Video annotation assumes ground truth annotations are `Darwin 2.0`
+format from V7 and implicitly converts it into our format. The
+predicted annotations are assumed to be in our own internal format.
+To render a video with annotations overlaid, run the following:
 
+```bash
+python -m traffic_ml.bin.annotate_vid \
+--source "PATH/TO/VID.mp4" \
+--gt_annot "PATH/TO/ANNOTATION.json" \
+--pred_annot "PATH/TO/ANNOTATION.db" \
+--save_dir "./OUT_DIR/"
+```
 
 ## Notebooks
 
