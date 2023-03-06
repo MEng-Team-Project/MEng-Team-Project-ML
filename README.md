@@ -70,6 +70,48 @@ python -m traffic_ml.bin.annotate_vid \
 --save_dir "./OUT_DIR/"
 ```
 
+## Benchmarking
+
+This section refers to automatically finding an ML pipeline which performs
+best for a given set of conditions. In practice, all provided combinations
+are run and all of the benchmarks, model validation and run time
+performance statistics, are stored so the best model can be decided.
+
+To run these tests, you first need to create a file called `test.json` with
+the following format (only include the fields you want to test, all possible
+fields are provided for completeness):
+
+```json
+{
+   "imgsz": [320, 480, 640], // Input resolution to YOLO model
+   "vid_stride": [1, 2, 3, 4, 5], // Detect objects every `n` frames
+   "yolo": {
+      "batch_size": [1], // No. of frames per inference
+      "model": [ // YOLOv8 model size
+         "yolov8n.pt",
+         "yolov8s.pt",
+         "yolov8m.pt",
+         "yolov8l.pt",
+      ]
+   },
+   "tracker": [ // Algorithm used to track objects after detection
+      "bytetrack",
+      "ocsort",
+      "strongsort"
+   ]
+}
+```
+
+To run the script, use the following command:
+
+```bash
+python -m traffic_ml.bin.benchmark
+--source "/PATH/TO/VID.mp4"
+--gt_annot "/PATH/TO/DARWIN_2_0.json"
+--save_dir "OUT_PATH/"
+--test_path "test.json"
+```
+
 ## Notebooks
 
 This section contains a detailed explanation for the contents and purpose
