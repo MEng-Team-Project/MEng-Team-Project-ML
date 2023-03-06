@@ -33,12 +33,12 @@ from absl import app
 from absl import flags
 
 FLAGS = flags.FLAGS
-
 flags.DEFINE_string("source",    None,     "Video path")
 flags.DEFINE_string("save_dir",  "./out/", "Save directory for annotated vid")
 flags.DEFINE_string("test_path", None,
                     "Path to benchmarking test conditions\n"
                     "Refer to README.md#Benchmarking for more details")
+flags.DEFINE_bool("yolo_reinstall", False, "Re-install YOLOv8 between runs")
 
 flags.mark_flag_as_required("source")
 flags.mark_flag_as_required("test_path")
@@ -46,7 +46,17 @@ flags.mark_flag_as_required("test_path")
 def sanitise_fname(fname):
     return str(Path(fname).stem).replace(".", "-")
 
-def run_analysis(source, imgsz, vid_stride, model, tracker, analysis_path, half=True):
+def run_analysis(
+        source,
+        imgsz,
+        vid_stride,
+        model,
+        tracker,
+        yolo_reinstall,
+        analysis_path,
+        log_path,
+        half=True):
+    
     args = [
         "python", "yolov8_tracking/track.py",
         "--source", source,
@@ -55,16 +65,25 @@ def run_analysis(source, imgsz, vid_stride, model, tracker, analysis_path, half=
         "--tracking-method", tracker,
         "--vid-stride", str(vid_stride),
         "--analysis_db_path", analysis_path,
+        "--log_path", log_path,
         "--half" if half else ""]
 
     print(args)
 
-    subprocess.run(args, cwd=os.getcwd())
+    if yolo_reinstall:
+        print(">>> REINSTALL YOLO")
+        subprocess.run(["pip3", "install", "ultralytics==8.0.20"])
+
+    print(">>> RUN ANALYSIS")
+    p = subprocess.run(
+        args,
+        cwd=os.getcwd())
 
 def main(unused_argv):
     source    = FLAGS.source
     save_dir  = FLAGS.save_dir
     test_path = FLAGS.test_path
+    yolo_reinstall = FLAGS.yolo_reinstall
 
     with open(test_path) as f:
         tests = json.loads(f.read())
@@ -85,6 +104,13 @@ def main(unused_argv):
         analysis_fname = \
             f'{sanitise_fname(source)}_sz_{imgsz}_stride_{vid_stride}_model_' \
             f'{model.replace(".", "-")}_tracker_{tracker}.db'
+        
+        log_fname = \
+            Path(save_dir) / \
+            f'{sanitise_fname(source)}_sz_{imgsz}_stride_{vid_stride}_model_' \
+            f'{model.replace(".", "-")}_tracker_{tracker}.txt'
+
+        log_fname = str(log_fname)
 
         run_analysis(
             source,
@@ -92,7 +118,9 @@ def main(unused_argv):
             vid_stride,
             model,
             tracker,
-            analysis_path=str(Path(save_dir) / analysis_fname))
+            yolo_reinstall,
+            analysis_path=str(Path(save_dir) / analysis_fname),
+            log_path=log_fname)
 
 if __name__ == "__main__":
     app.run(main)
