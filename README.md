@@ -105,6 +105,14 @@ using `motmetrics` lib.
 
 </details>
 
+<details><summary>5. Model Finetuning.ipynb</summary>
+
+Contains the code used to finetune a YOLOv8 model for a specific dataset.
+HGV dataset training is contained within the notebook and can be extended
+to other object classes as well.
+
+</details>
+
 ## HTTP API
 
 This section contains each of the HTTP endpoints for the microservice,
