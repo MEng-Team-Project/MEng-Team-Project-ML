@@ -180,6 +180,383 @@ def routes():
     except Exception as e:
         return jsonify("Error:", str(e)), 400
 
+@app.route("/api/routeAnalytics/", methods=["POST"])
+def routeAnalytics():
+    """ Aggregate analytic data from specific database file and filtered for
+        frontend 
+    args:
+        stream              - Stream ID to get data for.
+        regions             - Route region polygon information
+        classes             - List of COCO class labels to filter by
+        time_of_recording   - UTC float start time of source recording
+        start_time          - start of analytics collection
+        end_time            - end of analytics collection (default to end of source) 
+        start_regions       - List of start regions to filter by
+        end_regions         - List of end regions to filter by
+        interval_spacing    - Interval spacing to split up detections by (mins)
+        fps                 - (Optional) FPS to timestamp each frame
+    """
+    try:
+        import arrow 
+        import sqlite3
+        import pandas as pd
+        import numpy as np
+        from shapely.geometry import Point, Polygon
+
+        # Get stream ID
+        content = request.json
+        stream  = content["stream"]
+        print("api/routeAnalytics->content:", content)
+
+        # Check required fields
+        args = ['stream', 'regions', 'classes', 'start_time', 
+                'start_regions', 'end_regions', 'interval_spacing']
+        for arg in args:
+            if arg not in content:
+                return jsonify(f"Error: {arg.title()} required"), 400
+
+        # Main constant assignments
+        FILE_NAME           = stream
+        ROUTE_REGIONS       = content['regions']
+        CLASSES             = content['classes']
+        TIME_OF_RECORDING   = arrow.get(content['time_of_recording']) # UTC to Arrow
+        START_TIME          = arrow.get(content['start_time'])
+        if 'end_time' in content:
+            END_TIME        = arrow.get(content['end_time'])
+        START_REGIONS       = content['start_regions']
+        END_REGIONS         = content['end_regions']
+        INTERVAL_SPACING    = content['interval_spacing']
+
+        # Get SQLite detection data
+        analysis_path = Path(FLAGS.analysis_dir) / f"{stream}.db"
+        print(analysis_path.absolute())
+        con = sqlite3.connect(analysis_path)
+        
+        detections_df = pd.read_sql_query("SELECT * FROM detection;", con)
+        detections_df = detections_df.reindex(columns=['frame', 'label', 'det_id', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
+
+        ## Get FPS from metadata
+        if 'fps' not in content:
+            metadata_df = pd.read_sql_query("SELECT * FROM metadata;", con)
+            metadata_df = metadata_df.iloc[0]
+            if 'fps' in metadata_df:
+                FPS = metadata_df['fps']
+            else:
+                FPS = 30 # Default FPS value
+            
+        con.close()
+                
+        ### Detection Count (per Frame)
+        ### Change Frames to Timestamps
+        def newTimestamp(timestamp, frame, fps):
+            return timestamp.shift(microseconds=1000000/fps * frame)
+
+        # Change frames to timestamps
+        detections_df['frame'] = detections_df.apply(
+            lambda row: newTimestamp(TIME_OF_RECORDING, int(row["frame"]), FPS), 
+            axis=1
+        )
+        detections_df = detections_df.rename(columns={'frame':'timestamp'})
+        data = detections_df
+
+        ### Object Count
+        ### Object Tracking
+        routes_df = data[["timestamp", "label", "det_id", "bbox_x", "bbox_y", "bbox_w", "bbox_h"]].copy()
+        routes_df["anchor_x"] = routes_df.apply(
+            lambda row: row["bbox_x"] + (row["bbox_w"] / 2.0), axis=1)
+        routes_df["anchor_y"] = routes_df.apply(
+            lambda row: row["bbox_y"] + (row["bbox_h"] / 2.0), axis=1)
+
+        #### Either First and Last, or all Anchor Points for Each (label, det_id) Tuple
+        def get_values(group):
+            return group[['anchor_x', 'anchor_y']].values.tolist()
+
+        entire_routes = routes_df.groupby(['label', 'det_id']).apply(get_values)
+        ### Object Tracking (Start and Finish Regions)
+        # 1. Get start and end pos for each unique object during entire video
+        start_end_df = entire_routes.copy()
+        start_end_df = start_end_df.reset_index()
+
+        overlap_start_df = start_end_df.copy()[["label", "det_id"]]
+        overlap_end_df = start_end_df.copy()[["label", "det_id"]]
+
+        start_end_df["start_x"] = start_end_df.apply(lambda row: row[0][0][0],  axis=1)
+        start_end_df["start_y"] = start_end_df.apply(lambda row: row[0][0][1],  axis=1)
+        start_end_df["end_x"]   = start_end_df.apply(lambda row: row[0][-1][0], axis=1)
+        start_end_df["end_y"]   = start_end_df.apply(lambda row: row[0][-1][1], axis=1)
+        if 0 in start_end_df:
+            del start_end_df[0]
+
+        # 2. Get overlaps between start and end, and each region
+        region_polys = {}
+        for route_region in ROUTE_REGIONS.keys():
+            cur_polygon = Polygon(ROUTE_REGIONS[route_region])
+            region_polys[route_region] = cur_polygon
+
+            # Start Geometry
+            start_geometry = [Point(x, y) for x, y in zip(start_end_df["start_x"], start_end_df["start_y"])]
+
+            # Start Overlap
+            start_end_df[f"{route_region}_start_overlap"] = [point.within(cur_polygon) for point in start_geometry]
+            overlap_start_df[route_region]                = start_end_df[f"{route_region}_start_overlap"]
+
+            # End Geometry
+            end_geometry = [Point(x, y) for x, y in zip(start_end_df["end_x"], start_end_df["end_y"])]
+
+            # End Overlap
+            start_end_df[f"{route_region}_end_overlap"] = [point.within(cur_polygon) for point in end_geometry]
+            overlap_end_df[route_region]                = start_end_df[f"{route_region}_end_overlap"]
+
+        #### Determine Start Label
+        def label_overlap(row):
+            for i in range(len(row)):
+                if row[i]:
+                    return overlap_start_df.columns[2:][i]
+            return np.nan
+
+        overlap_start_df['overlap_label'] = overlap_start_df.iloc[:, 2:].apply(label_overlap, axis=1)
+
+        #### Determine End Label
+        def label_overlap(row):
+            for i in range(len(row)):
+                if row[i]:
+                    return overlap_end_df.columns[2:][i]
+            return np.nan
+
+        overlap_end_df['overlap_label'] = overlap_end_df.iloc[:, 2:].apply(label_overlap, axis=1)
+
+        #### Create Final Overlap DataFrame
+        overlap_df = start_end_df.iloc[:, :2]
+        overlap_df["start"] = overlap_start_df["overlap_label"]
+        overlap_df["end"]   = overlap_end_df["overlap_label"]
+
+        ### Finding Times Spent in and Out of Regions
+        #### Organise Route Boundary DataFrame
+        def get_values(group):
+            return group[['timestamp','anchor_x', 'anchor_y']].values.tolist()
+
+        route_boundaries_df = routes_df.groupby(['label', 'det_id']).apply(get_values)
+        route_boundaries_df = pd.DataFrame(route_boundaries_df.reset_index(name='route'))
+
+        # Add region names from overlap_df
+        route_boundaries_df = pd.merge(route_boundaries_df, overlap_df, on=['label', 'det_id'])
+        route_boundaries_df.rename(columns={'start':'start_region', 'end':'end_region'}, inplace=True)
+        entire_routes = route_boundaries_df.copy()
+
+        #### Arrange Start and End Points
+        route_boundaries_df['start_point'] = route_boundaries_df['route'].apply(lambda route: route[0])
+        route_boundaries_df['end_point'] = route_boundaries_df['route'].apply(lambda route: route[-1])
+
+        #### Find Starting Region Boundary
+        def findFirstRegionBoundary(vals):
+            initialRegion = which_region(Point(*vals[0][1:]))
+            if initialRegion is None: return None
+            
+            # Binary search for boundary point
+            pointRange = vals
+            while len(pointRange) > 1:
+                midIndex = round(len(pointRange)/2)
+                midpoint = pointRange[midIndex]
+                regionCheck = which_region(Point(*midpoint[1:]))
+
+                if regionCheck == initialRegion:
+                    pointRange = pointRange[midIndex:] # go right
+                else:
+                    pointRange = pointRange[:midIndex] # go left
+            
+            if len(pointRange) != 0: return pointRange[0]
+
+        def which_region(point):
+            for label, poly in region_polys.items():
+                if point.within(poly):
+                    return label
+
+        route_boundaries_df['start_boundary'] = route_boundaries_df['route'].apply(findFirstRegionBoundary)
+
+        #### Find Ending Region Boundary
+        def findEndRegionBoundary(start_region, end_region, route):
+            if start_region == end_region:
+                return None
+            else:
+                return findFirstRegionBoundary(route[::-1])
+
+        # Reverse the list and find the end region boundary
+        route_boundaries_df['end_boundary'] = route_boundaries_df.apply(
+            lambda row: findEndRegionBoundary(row['start_region'], row['end_region'], row['route']),
+            axis=1
+        )
+
+        #### Organise Dataframe
+        # Reorder columns
+        route_boundaries_df = route_boundaries_df.reindex(columns=['label', 'det_id', 'start_region', 'start_point', 'start_boundary', 'end_boundary', 'end_point', 'end_region'])
+        route_boundaries_df.loc[route_boundaries_df['label'] == 'car']
+
+        # ROUTE BOUNDARIES FINISHED HERE #
+
+        #### Workout Times Spent in Each Region From Timestamps
+        route_times_df = route_boundaries_df.copy()
+
+        def find_time(start_boundary, end_boundary):
+            if start_boundary is None or end_boundary is None: 
+                return None
+            else:
+                return end_boundary[0] - start_boundary[0]
+
+        # Time spent overall in the route
+        route_times_df['overall_time'] = route_times_df.apply(
+            lambda row: row['end_point'][0] - row['start_point'][0], 
+            axis=1
+        )
+
+        # Time spent in first region
+        route_times_df['start_region_time'] = route_times_df.apply(
+            lambda row: find_time(row['start_point'], row['start_boundary']), 
+            axis=1
+        )
+
+        # Time spent in last region
+        route_times_df['end_region_time'] = route_times_df.apply(
+            lambda row: row['start_region_time'] if pd.isna(result := find_time(row['end_boundary'], row['end_point'])) else result,
+            axis=1
+        )
+
+        def out_of_region_time(overall_time, start_region_time, end_region_time):
+            startIsNotNone = not pd.isna(start_region_time)
+            endIsNotNone = not pd.isna(end_region_time)
+
+            # Ensure if there's only one region the no_region_time is None
+            if overall_time == start_region_time: return None
+
+            if startIsNotNone and endIsNotNone and start_region_time != end_region_time:
+                return (overall_time - start_region_time) - end_region_time
+            elif startIsNotNone:
+                return overall_time - start_region_time
+            elif endIsNotNone:
+                return overall_time - end_region_time
+            else:
+                return overall_time
+            
+        # Time spent not in a region
+        route_times_df['no_region_time'] = route_times_df.apply(
+            lambda row: out_of_region_time(row['overall_time'], row['start_region_time'], row['end_region_time']), 
+            axis=1
+        )
+
+        # Reorder columns
+        route_times_df = route_times_df.reindex(columns=['label', 'det_id', 'start_region', 'overall_time', 'start_region_time', 'end_region_time', 'no_region_time', 'end_region'])
+
+        ## Add start and end times of detection for time filtering
+        route_times_df['start_time'] = route_boundaries_df['start_point'].apply(
+            lambda row: row[0],
+        )
+        route_times_df['end_time'] = route_boundaries_df['end_point'].apply(
+            lambda row: row[0],
+        )
+
+        ### Sort DataFrame
+        route_times_df.sort_values(['start_time', 'end_time'], axis=0, inplace=True)
+
+        ### Data filtering
+        route_times_df = route_times_df[route_times_df['label'].isin(CLASSES)]
+
+        ### Splitting the detections by timestamp intervals
+        if 'end_time' not in content:
+            END_TIME = route_times_df['end_time'].iloc[-1]
+        timeBoundaries = [i for i in arrow.Arrow.interval('minutes', START_TIME, END_TIME, INTERVAL_SPACING)]
+        BoundaryEnds = [i[1] for i in timeBoundaries]
+
+        detSplit = [[] for i in range(len(BoundaryEnds))]
+        currentDet = 0
+        for boundaryIndex, timeBoundary in enumerate(timeBoundaries):
+            nextBound = False
+
+            for detIndex, det in route_times_df.iloc[currentDet:].iterrows():
+                start = det['start_time']
+                end = det['end_time']
+
+                if start.is_between(*timeBoundary):
+                    # if end within time interval or at least has more time in interval
+                    if end.is_between(*timeBoundary) or \
+                            timeBoundary[1] - start > end - timeBoundary[1] or \
+                            boundaryIndex + 1 >= len(detSplit): 
+                        destInterval = boundaryIndex # Add detection to current interval
+                    else:
+                        destInterval = boundaryIndex + 1 # Add detection to next interval
+                    detSplit[destInterval].append(det)
+                else:
+                    nextBound = True
+                    break
+
+                currentDet += 1
+
+            if nextBound:
+                continue
+
+        ### Split Detections into data-structure with interval stamps
+
+        # Separate Detections (dets) by period of time
+        countsAtTimes = [{'periodFrom'  : from_.float_timestamp, 
+                        'periodTo'    : to_.float_timestamp,
+                        'routeCounts' : pd.DataFrame(dets, columns=route_times_df.columns)} \
+                    for (from_, to_), dets in zip(timeBoundaries, detSplit)]
+        countsAtTimes[0]['routeCounts']
+
+        # Count detection types by their label and sum their counts in 'total'
+        def countByClass(df):
+            counts = {'total':0}
+            for _, row in df.iterrows():
+                label = row['label']
+                if label in counts:
+                    counts[label] += 1
+                else:
+                    counts[label] = 1
+                counts['total'] += 1
+            return counts
+
+        # Separate Further into Directional Combinations of Start region and End region for each interval
+        for interval in countsAtTimes:
+            routeCounts = interval['routeCounts']
+            
+            # Filter detections by their Start and End regions
+            routeCounts = routeCounts[
+                (routeCounts['start_region'].isin(START_REGIONS)) &
+                (routeCounts['end_region'].isin(END_REGIONS))]
+            
+            # Split detections by start end region combinations
+            detSplit = {}
+            for _, det in routeCounts.iterrows():
+                start, end = det['start_region'], det['end_region']
+                if start == end:
+                    continue # filter out stationary detections
+                elif (start, end) not in detSplit:
+                    detSplit[(start, end)] = [det]
+                else:
+                    detSplit[(start, end)].append(det)
+
+            # Structure the split detections
+            routeCounts = []
+            for key, value in detSplit.items():
+                df = pd.DataFrame(value, columns=route_times_df.columns)
+                routeCounts.append({
+                    'start': key[0], 
+                    'end': key[1], 
+                    'counts': countByClass(df)
+                })
+
+            interval['routeCounts'] = routeCounts
+
+        # Structure the rest of the json message
+        final_data = {
+            "dataSource": FILE_NAME,
+            "regions": list(ROUTE_REGIONS.keys()),
+            "countsAtTimes": countsAtTimes
+        }
+        print(json.dumps(final_data, indent=4))
+        return jsonify(final_data)
+
+    except Exception as e:
+        return jsonify("Error:", str(e)), 400
+
 @app.route("/api/analysis/", methods=["POST"])
 def analysis():
     """Get count and route analytical information of a video stream.
