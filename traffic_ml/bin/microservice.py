@@ -191,8 +191,8 @@ def routeAnalytics():
         time_of_recording   - UTC float start time of source recording
         start_time          - start of analytics collection
         end_time            - end of analytics collection (default to end of source) 
-        start_regions       - List of start regions to filter by
-        end_regions         - List of end regions to filter by
+        start_regions       - List of start regions to filter by (default all)
+        end_regions         - List of end regions to filter by (default all)
         interval_spacing    - Interval spacing to split up detections by (mins)
         fps                 - (Optional) FPS to timestamp each frame
     """
@@ -209,8 +209,7 @@ def routeAnalytics():
         print("api/routeAnalytics->content:", content)
 
         # Check required fields
-        args = ['stream', 'regions', 'classes', 'start_time', 
-                'start_regions', 'end_regions', 'interval_spacing']
+        args = ['stream', 'regions', 'classes', 'start_time', 'interval_spacing']
         for arg in args:
             if arg not in content:
                 return jsonify(f"Error: {arg.title()} required"), 400
@@ -223,9 +222,16 @@ def routeAnalytics():
         START_TIME          = arrow.get(content['start_time'])
         if 'end_time' in content:
             END_TIME        = arrow.get(content['end_time'])
-        START_REGIONS       = content['start_regions']
-        END_REGIONS         = content['end_regions']
+        if 'start_regions' in content:
+            START_REGIONS   = content['start_regions']
+        else:
+            START_REGIONS   = ROUTE_REGIONS.keys() 
+        if 'end_regions' in content:
+            END_REGIONS     = content['end_regions']
+        else:
+            END_REGIONS     = ROUTE_REGIONS.keys()
         INTERVAL_SPACING    = content['interval_spacing']
+
 
         # Get SQLite detection data
         analysis_path = Path(FLAGS.analysis_dir) / f"{stream}.db"
