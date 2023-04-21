@@ -191,9 +191,9 @@ def routeAnalytics():
         time_of_recording   - UTC float start time of source recording
         start_time          - start of analytics collection
         end_time            - end of analytics collection (default to end of source) 
-        start_regions       - List of start regions to filter by (default all)
-        end_regions         - List of end regions to filter by (default all)
-        interval_spacing    - Interval spacing to split up detections by (mins)
+        start_regions       - (Optional) List of start regions to filter by (default all)
+        end_regions         - (Optional) List of end regions to filter by (default all)
+        interval_spacing    - (Optional) Interval spacing to split up detections by (secs)
         fps                 - (Optional) FPS to timestamp each frame
     """
     try:
@@ -209,7 +209,7 @@ def routeAnalytics():
         print("api/routeAnalytics->content:", content)
 
         # Check required fields
-        args = ['stream', 'regions', 'classes', 'start_time', 'interval_spacing']
+        args = ['stream', 'regions', 'classes', 'start_time']
         for arg in args:
             if arg not in content:
                 return jsonify(f"Error: {arg.title()} required"), 400
@@ -230,7 +230,10 @@ def routeAnalytics():
             END_REGIONS     = content['end_regions']
         else:
             END_REGIONS     = ROUTE_REGIONS.keys()
-        INTERVAL_SPACING    = content['interval_spacing']
+        if 'interval_spacing' in content:
+            INTERVAL_SPACING    = content['interval_spacing']
+        else:
+            INTERVAL_SPACING = None
 
 
         # Get SQLite detection data
@@ -468,7 +471,14 @@ def routeAnalytics():
         ### Splitting the detections by timestamp intervals
         if 'end_time' not in content:
             END_TIME = route_times_df['end_time'].iloc[-1]
-        timeBoundaries = [i for i in arrow.Arrow.interval('minutes', START_TIME, END_TIME, INTERVAL_SPACING)]
+
+        if INTERVAL_SPACING is None:
+            INTERVAL_SPACING = END_TIME - TIME_OF_RECORDING
+            INTERVAL_SPACING = INTERVAL_SPACING.days * 86400 \
+                               + INTERVAL_SPACING.seconds
+            INTERVAL_SPACING = 30 if INTERVAL_SPACING == 0 else INTERVAL_SPACING
+
+        timeBoundaries = [i for i in arrow.Arrow.interval('seconds', START_TIME, END_TIME, INTERVAL_SPACING)]
         BoundaryEnds = [i[1] for i in timeBoundaries]
 
         detSplit = [[] for i in range(len(BoundaryEnds))]
@@ -520,7 +530,8 @@ def routeAnalytics():
             return counts
 
         # Separate Further into Directional Combinations of Start region and End region for each interval
-        for interval in countsAtTimes:
+        to_remove = []
+        for index, interval in enumerate(countsAtTimes):
             routeCounts = interval['routeCounts']
             
             # Filter detections by their Start and End regions
@@ -549,7 +560,18 @@ def routeAnalytics():
                     'counts': countByClass(df)
                 })
 
+            # If routes empty add list to delete time period
+            if len(routeCounts) == 0:
+                to_remove.append(index)
+
             interval['routeCounts'] = routeCounts
+
+        # Remove empty routeCounts
+        temp_list = []
+        for i, interval in enumerate(countsAtTimes):
+            if i not in to_remove:
+                temp_list.append(interval)
+        countsAtTimes = temp_list
 
         # Structure the rest of the json message
         final_data = {
@@ -557,7 +579,7 @@ def routeAnalytics():
             "regions": list(ROUTE_REGIONS.keys()),
             "countsAtTimes": countsAtTimes
         }
-        print(json.dumps(final_data, indent=4))
+        # print(json.dumps(final_data, indent=4))
         return jsonify(final_data)
 
     except Exception as e:
