@@ -577,7 +577,8 @@ def routeAnalytics():
         final_data = {
             "dataSource": FILE_NAME,
             "regions": list(ROUTE_REGIONS.keys()),
-            "countsAtTimes": countsAtTimes
+            "countsAtTimes": countsAtTimes,
+            "intervalSpacing": INTERVAL_SPACING
         }
         # print(json.dumps(final_data, indent=4))
         return jsonify(final_data)
