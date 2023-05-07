@@ -209,7 +209,7 @@ def routeAnalytics():
         print("api/routeAnalytics->content:", content)
 
         # Check required fields
-        args = ['stream', 'regions', 'classes', 'start_time', 'interval_spacing']
+        args = ['stream', 'regions', 'classes', 'start_time' ]
         for arg in args:
             if arg not in content:
                 return jsonify(f"Error: {arg.title()} required"), 400
@@ -230,7 +230,8 @@ def routeAnalytics():
             END_REGIONS     = content['end_regions']
         else:
             END_REGIONS     = ROUTE_REGIONS.keys()
-        INTERVAL_SPACING    = content['interval_spacing']
+        if 'interval_spacing' in content:
+            INTERVAL_SPACING    = content['interval_spacing']
 
 
         # Get SQLite detection data
@@ -468,7 +469,9 @@ def routeAnalytics():
         ### Splitting the detections by timestamp intervals
         if 'end_time' not in content:
             END_TIME = route_times_df['end_time'].iloc[-1]
-        timeBoundaries = [i for i in arrow.Arrow.interval('minutes', START_TIME, END_TIME, INTERVAL_SPACING)]
+        if 'interval_spacing' not in content:
+            INTERVAL_SPACING = (END_TIME - START_TIME).seconds
+        timeBoundaries = [i for i in arrow.Arrow.interval('seconds', START_TIME, END_TIME, INTERVAL_SPACING)]
         BoundaryEnds = [i[1] for i in timeBoundaries]
 
         detSplit = [[] for i in range(len(BoundaryEnds))]
@@ -555,7 +558,8 @@ def routeAnalytics():
         final_data = {
             "dataSource": FILE_NAME,
             "regions": list(ROUTE_REGIONS.keys()),
-            "countsAtTimes": countsAtTimes
+            "countsAtTimes": countsAtTimes,
+            "intervalSpacing": INTERVAL_SPACING
         }
         print(json.dumps(final_data, indent=4))
         return jsonify(final_data)
