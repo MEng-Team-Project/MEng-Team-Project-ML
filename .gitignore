@@ -165,3 +165,7 @@ datasets/
 
 # Neptune Logging
 .neptune/
+
+# Ignore all this stuff pal
+out/
+runs/
