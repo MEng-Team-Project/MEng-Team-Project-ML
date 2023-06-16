@@ -46,6 +46,14 @@ To run the microservice, run the following code:
 python -m traffic_ml.bin.microservice --analysis_dir "PATH_TO/MEng-Team-Project-Web/server/analysis"
 ```
 
+## Testing
+
+Use the following code to verify the unit tests for the utility functions passes:
+
+```bash
+python -m traffic_ml.bin.run_tests
+```
+
 ## Source File Formats
 
 - Accepts .mp4 source files. This is enforced during video stream
