@@ -483,31 +483,58 @@ def routeAnalytics():
 
         detSplit = [[] for i in range(len(BoundaryEnds))]
         currentDet = 0
-        for boundaryIndex, timeBoundary in enumerate(timeBoundaries):
-            nextBound = False
 
-            for detIndex, det in route_times_df.iloc[currentDet:].iterrows():
-                start = det['start_time']
-                end = det['end_time']
+        print("INTERVAL_SPACING:", INTERVAL_SPACING)
+        print("route_times_df, timeBoundaries, BoundaryEnds, detSplit:", route_times_df, timeBoundaries, BoundaryEnds, detSplit)
+        if "interval_spacing" in content:
+            for boundaryIndex, timeBoundary in enumerate(BoundaryEnds):
+                nextBound = False
 
-                if start.is_between(*timeBoundary):
-                    # if end within time interval or at least has more time in interval
-                    if end.is_between(*timeBoundary) or \
-                            timeBoundary[1] - start > end - timeBoundary[1] or \
-                            boundaryIndex + 1 >= len(detSplit): 
-                        destInterval = boundaryIndex # Add detection to current interval
+                for detIndex, det in route_times_df.iloc[currentDet:].iterrows():
+                    start = det['start_time']
+                    end = det['end_time']
+                    # working interval code
+                    if start < timeBoundary:
+                        # if end within time interval or at least has more time in interval
+                        if end < timeBoundary or timeBoundary - start > end - timeBoundary:
+                            destInterval = boundaryIndex # Add detection to current interval
+                        else:
+                            destInterval = boundaryIndex + 1 # Add detection to next interval
+                        detSplit[destInterval].append(det)
                     else:
-                        destInterval = boundaryIndex + 1 # Add detection to next interval
-                    detSplit[destInterval].append(det)
-                else:
-                    nextBound = True
-                    break
+                        nextBound = True
+                        break
 
-                currentDet += 1
+                    currentDet += 1
 
-            if nextBound:
-                continue
+                if nextBound:
+                    continue
+        else:
+            for boundaryIndex, timeBoundary in enumerate(timeBoundaries):
+                nextBound = False
 
+                for detIndex, det in route_times_df.iloc[currentDet:].iterrows():
+                    start = det['start_time']
+                    end = det['end_time']
+                    # working all code
+                    if start.is_between(*timeBoundary):
+                        # if end within time interval or at least has more time in interval
+                        if end.is_between(*timeBoundary) or \
+                                timeBoundary[1] - start > end - timeBoundary[1] or \
+                                boundaryIndex + 1 >= len(detSplit): 
+                            destInterval = boundaryIndex # Add detection to current interval
+                        else:
+                            destInterval = boundaryIndex + 1 # Add detection to next interval
+                        detSplit[destInterval].append(det)
+                    else:
+                        nextBound = True
+                        break
+
+                    currentDet += 1
+
+                if nextBound:
+                    continue
+                
         ### Split Detections into data-structure with interval stamps
 
         # Separate Detections (dets) by period of time
@@ -515,7 +542,7 @@ def routeAnalytics():
                         'periodTo'    : to_.float_timestamp,
                         'routeCounts' : pd.DataFrame(dets, columns=route_times_df.columns)} \
                     for (from_, to_), dets in zip(timeBoundaries, detSplit)]
-        countsAtTimes[0]['routeCounts']
+        # countsAtTimes[0]['routeCounts']
 
         # Count detection types by their label and sum their counts in 'total'
         def countByClass(df):
@@ -583,6 +610,8 @@ def routeAnalytics():
         return jsonify(final_data)
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify("Error:", str(e)), 400
 
 @app.route("/api/analysis/", methods=["POST"])

@@ -1,0 +1,16 @@
+{
+   "imgsz": [320, 480, 640],
+   "vid_stride": [1, 2, 3, 4, 5],
+   "batch_size": [1],
+   "model": [
+      "yolov8n.pt",
+      "yolov8s.pt",
+      "yolov8m.pt",
+      "yolov8l.pt"
+   ],
+   "tracker": [
+      "bytetrack",
+      "ocsort",
+      "strongsort"
+   ]
+}

@@ -36,10 +36,11 @@ from traffic_ml.lib.convertor import Annotations
 from ultralytics.yolo.data.dataloaders.stream_loaders import LoadImages
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("source",     None,    "Video path")
-flags.DEFINE_string("gt_annot",   None,    "Ground truth annotations")
-flags.DEFINE_string("pred_annot", None,    "(Optional) Predicted annotations for contrast")
-flags.DEFINE_string("save_dir",   "./out/", "Save directory for annotated vid")
+flags.DEFINE_string("source",      None,     "Video path")
+flags.DEFINE_string("gt_annot",    None,     "Ground truth annotations")
+flags.DEFINE_string("pred_annot",  None,     "(Optional) Predicted annotations for contrast")
+flags.DEFINE_string("save_path",   "./out/", "Save path for annotated vid")
+flags.DEFINE_integer("vid_stride", 1,        "(Optional) Plot strided annotations")
 flags.mark_flag_as_required("source")
 flags.mark_flag_as_required("gt_annot")
 
@@ -67,19 +68,19 @@ def write_frame(r, im0, color):
         0.75, [225, 255, 255],
         thickness=2)
 
-def main(unused_argv):
+def write_vid(src, dst, gt_annot, pred_annot):
     fps = 30
 
-    images = LoadImages(FLAGS.source,
+    images = LoadImages(src,
                         imgsz=640,
                         stride=32,
                         auto=True,
                         transforms=None,
                         vid_stride=1)
 
-    gt_annots = Annotations.from_darwin(FLAGS.gt_annot)
+    gt_annots = Annotations.from_darwin(gt_annot)
     
-    save_path = str(Path(FLAGS.save_dir) / str(Path(FLAGS.source).stem + ".mp4"))
+    save_path = dst
 
     writer = cv2.VideoWriter(
         save_path,
@@ -87,29 +88,32 @@ def main(unused_argv):
         fps,
         (1920, 1080))
     
-    if FLAGS.pred_annot:
-        con = sqlite3.connect(FLAGS.pred_annot)
+    if pred_annot:
+        con = sqlite3.connect(pred_annot)
         detections_df = pd.read_sql_query("SELECT * FROM detection;", con)
         con.close()
 
     for f, img in enumerate(images):
-        source, _, im0, _, _ = img
+        _, _, im0, _, _ = img
 
         annots = gt_annots[gt_annots["frame"] == f]
 
-        # Write GT Annots
         for i, r in annots.iterrows():
             write_frame(r, im0, GREEN)
         
-        # (Optionally) Write Pred Annots
-        if FLAGS.pred_annot:
-            annots      = detections_df[detections_df["frame"] == f]
-            for i, r in annots.iterrows():
+        if pred_annot and not f % FLAGS.vid_stride:
+            pred_f = int(f / FLAGS.vid_stride)
+
+            annots = detections_df[detections_df["frame"] == pred_f]
+            for j, r in annots.iterrows():
                 write_frame(r, im0, RED)
             
         writer.write(im0)
 
     writer.release()
+
+def main(unused_argv):
+    write_vid(FLAGS.source, FLAGS.save_path, FLAGS.gt_annot, FLAGS.pred_annot)
 
 if __name__ == "__main__":
     app.run(main)
